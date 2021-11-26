@@ -1,3 +1,5 @@
+https://htmlview.glitch.me/?https://github.com/JuliaAcademy/Decision-Making-Under-Uncertainty/blob/master/html/1-MDPs.jl.html
+
 struct S
     c # chairs remaining 
     t # time remaining 
