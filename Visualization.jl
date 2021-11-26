@@ -6,11 +6,6 @@ using Parameters, Random
 
 using Plots; default(fontfamily="Computer Modern", framestyle=:box) # LaTex-style
 
-```
-PSEUDOCODE 
-
-1. Figure out how to generate plot with j
-```
 
 struct State
 	x::Int
