@@ -1,6 +1,6 @@
-# optimize-evacuation
-Final project for CS238
+# Prioritizing Emergency Evacuations Using Partially Observable Markcov Decision Processes 
+IEEE GHTC Conference Submission
 
 Info in Overleaf: 
-https://www.overleaf.com/project/618aba96f3533e1a092548e5
+https://www.overleaf.com/project/61df03a4a582c1465215cb95
 
