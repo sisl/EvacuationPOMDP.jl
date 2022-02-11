@@ -114,6 +114,11 @@ params = EvacuationParameters();
 # ╔═╡ a9899239-df71-41a2-bc66-f08ee325ffe2
 params.v_inttostring
 
+# ╔═╡ 82808920-d4b2-4848-b368-9d89f93b66e3
+md"""
+> TODO: Make the `v` portion an index and not the value (then look up the value in the `reward` function). That way we _could_ have the same value associated to an given visa status.
+"""
+
 # ╔═╡ e7b7253f-68c6-4026-9a86-37d016e189d2
 begin
 	# The state space S for the evacuation problem is the set of all combinations 
@@ -259,7 +264,7 @@ md"""
 """
 
 # ╔═╡ dda2b2be-b488-48c9-8475-2e4876ae517f
-abstract type Evacuation <: MDP{State, Action} end
+abstract type EvacuationMDP <: MDP{State, Action} end
 
 # ╔═╡ 889f89e8-61d2-4273-a63c-bcb6e6b0852d
 begin
@@ -273,7 +278,7 @@ begin
 end;
 
 # ╔═╡ 6bf5f2f2-b5d1-48a6-b811-f416bcfc9899
-mdp = QuickMDP(Evacuation,
+mdp = QuickMDP(EvacuationMDP,
     states       = 𝒮,
     actions      = 𝒜,
     transition   = T,
@@ -294,7 +299,8 @@ md"""
 solver = ValueIterationSolver(max_iterations=30, belres=1e-6, verbose=true);
 
 # ╔═╡ f7ae5cc2-29d0-42fd-8210-d95417e825b1
-mdp_policy = solve(solver, mdp)  # look at this to see why it's not graphing anymore
+# mdp_policy = solve(solver, mdp)  # look at this to see why it's not graphing anymore
+## commented out because it was taking a while each time
 
 # ╔═╡ f755070e-615b-4ca3-9c28-58170af21856
 md"""
@@ -617,7 +623,7 @@ md"""
 
 # ╔═╡ 621e43d5-39da-4fd5-8f4b-6cd5fb18d0d5
 # turn probabilities into counts 
-𝒟₀ = Dirichlet(Int.(params.visa_prob .* 100))
+𝒟₀ = Dirichlet(round.(normalize(params.visa_prob, 1) .* 100))
 
 # ╔═╡ a9e85360-3add-42d9-82c6-fe66bf506811
 # Plot Dirichlet distribution counts over each provided category.
@@ -754,6 +760,9 @@ md"""
 # ╔═╡ a081e9f0-1ee6-4c28-9409-c3ce1e190084
 @enum Observation ISIS Afghan P1P2Afghan SIV AMCIT # TODO: documented visa status?
 
+# ╔═╡ 69310797-4d07-472c-9869-8217fa11971f
+𝒪 = [ISIS, Afghan, P1P2Afghan, SIV, AMCIT]
+
 # ╔═╡ 18a6f1e2-5ee2-40b2-8861-9e634a74de3a
 md"""
 ## Observation function
@@ -769,23 +778,97 @@ O(o_\text{AMCIT} \mid s'_\text{AMCIT}) &= x\%
 """
 
 # ╔═╡ b2aef310-148f-4386-a41e-ead3c32f6ca4
-function O(a::Action, s′::State)
-	if params.v_inttostring[s′] == "ISIS-K"
-		# return SparseCat([])
-	end
-	# if s′ == HUNGRYₛ
-	# 	return SparseCat([CRYINGₒ, QUIETₒ],
-	# 		             [params.p_crying_when_hungry, 1-params.p_crying_when_hungry])
-	# elseif s′ == FULLₛ
-	# 	return SparseCat([CRYINGₒ, QUIETₒ],
-	# 		             [params.p_crying_when_full, 1-params.p_crying_when_full])
-	# end
+md"""
+- then try a bunch of free online solvers. Solve with a few online solvers and compare.
+- Each have their own drawbacks. 
+- Solving MDP w/ value iteration guaranteed to give optimal...With perfect information vs. realistic partially observable.
+"""
+
+# ╔═╡ d4fe4f99-f420-47af-8896-3ee31c635690
+sindex = (pomdp, v) -> findfirst(params.visa_status .== v)
+
+# ╔═╡ 79c0dbfb-8e2c-4d3a-b9fe-04ce6e41672a
+function O(pomdp, a::Action, s′::State)
+  obs = ordered_observations(pomdp)
+  p = 0.05 * ones(length(obs)) # introduce some noise in the observations
+  if s′ != params.null_state
+      state_index = sindex(pomdp, s′.v)
+      p[state_index] = 1
+  end
+  normalize!(p, 1)
+  return SparseCat(obs, p)
 end
 
+# ╔═╡ 810354f9-c28b-4d82-a05b-12fe2636022c
+abstract type EvacuationPOMDP <: POMDP{State, Action, Observation} end
 
-# then try a bunch of free online solvers. Solve with a few online solvers and compare.
-# Each have their own drawbacks. 
-# Solving MDP w/ value iteration guaranteed to give optimal...With perfect information vs. realistic partially observable.
+# ╔═╡ 27bd873f-c7b1-4323-99e3-6f6be02eb8b5
+pomdp = QuickPOMDP(EvacuationPOMDP,
+    states       = 𝒮,
+    actions      = 𝒜,
+    observations = 𝒪,
+    transition   = T,
+    reward       = R,
+    observation  = (a,s′)->O(pomdp,a,s′),
+    discount     = γ,
+    initialstate = initialstate_array,
+    isterminal   = termination,
+  statetype    = statetype
+);
+
+# ╔═╡ 2b4fdacd-067b-4878-91c3-3f1cde1e2d97
+observation(pomdp, ACCEPT, rand(𝒮))
+
+# ╔═╡ 4083a989-f196-4b9a-abf2-8f7b34f09168
+transition(pomdp, State(1,1,1,-500), ACCEPT)
+
+# ╔═╡ d47c2f84-ca16-4337-80ef-3abd94a77f6a
+prior_belief = Categorical([0.01, 0.50, 0.14, 0.20, 0.15]);
+
+# ╔═╡ b19b0e4a-4c30-4357-b5f2-b59009452019
+state_list = params.visa_status
+
+# ╔═╡ 6697182b-2520-4404-b116-d016a121cc41
+module DirichletBeliefs
+   using BeliefUpdaters
+   using Parameters
+   using StatsBase
+   include("belief.jl")
+end
+
+# ╔═╡ 1bc4b5d0-51c4-4c33-a7f0-2a245016c85f
+import .DirichletBeliefs:
+   DirichletBelief,
+   uniform_belief,
+   pdf,
+   support,
+   DirichletUpdater,
+   initialize_belief,
+   update,
+   DirichletSubspaceBelief,
+   DirichletSubspaceUpdater; DirichletBeliefs # Trigger.
+
+# ╔═╡ 453da136-bd07-4e7c-a47a-0bad8765eb7e
+up = DirichletSubspaceUpdater(pomdp, sindex);
+
+# ╔═╡ da134037-11fb-4f76-8381-e128a37d43eb
+_b′ = initialize_belief(up, prior_belief, state_list)
+
+# ╔═╡ deff1a4c-d3cd-4307-8646-3085055fa6e3
+_b′.state_list
+
+# ╔═╡ 37965adc-08f2-4037-bd76-d3e67b36c601
+pdf(_b′, -500)
+
+# ╔═╡ c01e8357-c094-4373-ba49-faa149dc7191
+begin
+  b′ = initialize_belief(up, prior_belief, state_list)
+  for num_updates in 1:1
+      o = 𝒪[rand(𝒟_true)]
+      b′ = update(up, b′, ACCEPT, o)
+    end
+  [mean(b′) b′.b.alpha]
+end
 
 # ╔═╡ edae2f7c-cd4c-42f6-a423-ad5f1f1bf5cd
 md"""
@@ -795,6 +878,7 @@ md"""
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BeliefUpdaters = "8bb6e9a1-7d73-552c-a44a-e5dc5634aac4"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DiscreteValueIteration = "4b033969-44f6-5439-a48b-c11fa3648068"
@@ -810,8 +894,10 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 QuickPOMDPs = "8af83fb2-a731-493c-9049-9e19dbce6165"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
+BeliefUpdaters = "~0.2.2"
 ColorSchemes = "~3.16.0"
 DataStructures = "~0.18.11"
 DiscreteValueIteration = "~0.4.5"
@@ -825,6 +911,7 @@ Parameters = "~0.12.3"
 Plots = "~1.25.7"
 PlutoUI = "~0.7.33"
 QuickPOMDPs = "~0.2.13"
+StatsBase = "~0.33.14"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -1291,7 +1378,7 @@ uuid = "093fc24a-ae57-5d10-9952-331d41423f4d"
 version = "1.3.5"
 
 [[LinearAlgebra]]
-deps = ["Libdl"]
+deps = ["Libdl", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[LogExpFunctions]]
@@ -1358,6 +1445,10 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "887579a3eb005446d514ab7aeac5d1d027658b8f"
 uuid = "e7412a2a-1a6e-54c0-be00-318e2571c051"
 version = "1.3.5+1"
+
+[[OpenBLAS_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
+uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
 
 [[OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
@@ -1531,7 +1622,7 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[Random]]
-deps = ["Serialization"]
+deps = ["SHA", "Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[RecipesBase]]
@@ -1887,6 +1978,10 @@ git-tree-sha1 = "5982a94fcba20f02f42ace44b9894ee2b140fe47"
 uuid = "0ac62f75-1d6f-5e53-bd7c-93b484bb37c0"
 version = "0.15.1+0"
 
+[[libblastrampoline_jll]]
+deps = ["Artifacts", "Libdl", "OpenBLAS_jll"]
+uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
+
 [[libfdk_aac_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "daacc84a041563f965be61859a36e17c4e4fcd55"
@@ -1944,6 +2039,7 @@ version = "0.9.1+5"
 # ╠═a9899239-df71-41a2-bc66-f08ee325ffe2
 # ╟─a0a58020-32ed-42b4-ad9c-2d1c0357f3c3
 # ╠═99790e08-5bb7-4611-8d4b-39db4d36ca83
+# ╟─82808920-d4b2-4848-b368-9d89f93b66e3
 # ╠═e7b7253f-68c6-4026-9a86-37d016e189d2
 # ╠═c4bb4cf3-c185-4e35-91fa-f1de57590002
 # ╟─b731de36-942b-4e63-8664-9bf97b43dcb4
@@ -2022,8 +2118,24 @@ version = "0.9.1+5"
 # ╟─958c44ef-9c64-484c-ae80-0a62f2142225
 # ╠═257308b7-c3c5-43cc-98ba-8f8a8306fb61
 # ╠═a081e9f0-1ee6-4c28-9409-c3ce1e190084
+# ╠═69310797-4d07-472c-9869-8217fa11971f
 # ╠═18a6f1e2-5ee2-40b2-8861-9e634a74de3a
 # ╠═b2aef310-148f-4386-a41e-ead3c32f6ca4
+# ╠═d4fe4f99-f420-47af-8896-3ee31c635690
+# ╠═79c0dbfb-8e2c-4d3a-b9fe-04ce6e41672a
+# ╠═810354f9-c28b-4d82-a05b-12fe2636022c
+# ╠═27bd873f-c7b1-4323-99e3-6f6be02eb8b5
+# ╠═2b4fdacd-067b-4878-91c3-3f1cde1e2d97
+# ╠═4083a989-f196-4b9a-abf2-8f7b34f09168
+# ╠═d47c2f84-ca16-4337-80ef-3abd94a77f6a
+# ╠═b19b0e4a-4c30-4357-b5f2-b59009452019
+# ╠═6697182b-2520-4404-b116-d016a121cc41
+# ╠═1bc4b5d0-51c4-4c33-a7f0-2a245016c85f
+# ╠═453da136-bd07-4e7c-a47a-0bad8765eb7e
+# ╠═da134037-11fb-4f76-8381-e128a37d43eb
+# ╠═deff1a4c-d3cd-4307-8646-3085055fa6e3
+# ╠═37965adc-08f2-4037-bd76-d3e67b36c601
+# ╠═c01e8357-c094-4373-ba49-faa149dc7191
 # ╟─edae2f7c-cd4c-42f6-a423-ad5f1f1bf5cd
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
