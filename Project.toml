@@ -1,0 +1,4 @@
+name = "EvacuationPOMDP"
+uuid = "b2501907-9a1c-4bf2-891a-64100e3a354e"
+authors = ["Lisa Einstein <lisaeinstein@gmail.com>", "Robert Moss <rmoss92@gmail.com>"]
+version = "0.1.0"
