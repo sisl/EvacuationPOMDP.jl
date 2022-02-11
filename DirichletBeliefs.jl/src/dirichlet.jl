@@ -97,10 +97,9 @@ update(up::DirichletUpdater, distr::Categorical, a, o) = update(up, initialize_b
 ## Dirichlet subspace belief and updater
 ##################################################
 
-mutable struct DirichletSubspaceBelief{M<:MOMDP, Sh, S}
+mutable struct DirichletSubspaceBelief{M<:MOMDP, Sh}
     momdp::M
     hidden_state_list::Vector{Sh}
-    state_list::Vector{S}
     b::Dirichlet
     visiblestate::Any
 end
@@ -114,10 +113,9 @@ DirichletSubspaceBelief(momdp::M) where M <: MOMDP = uniform_subspace_belief(mom
 
 function DirichletSubspaceBelief(momdp::M, α::Vector{<:Real}) where M <: MOMDP
     hidden_state_list = ordered_hidden_states(momdp)
-    state_list = ordered_states(momdp)
     α = convert(Vector{Float64}, α)
     b = Dirichlet(α)
-    return DirichletSubspaceBelief(momdp, hidden_state_list, state_list, b, nothing)
+    return DirichletSubspaceBelief(momdp, hidden_state_list, b, nothing)
 end
 
 function uniform_subspace_belief(momdp::M) where M <: MOMDP
@@ -173,7 +171,6 @@ end
 function update(up::DirichletSubspaceUpdater, b::DirichletSubspaceBelief, a, o)
     momdp = up.momdp
     hidden_state_space = b.hidden_state_list
-    state_space = b.state_list
     α = b.b.alpha
     α′ = copy(α)
     sᵥ = b.visiblestate
@@ -191,7 +188,7 @@ function update(up::DirichletSubspaceUpdater, b::DirichletSubspaceBelief, a, o)
         end
     end
 
-    return DirichletSubspaceBelief(momdp, hidden_state_space, state_space, Dirichlet(α′), sᵥ)
+    return DirichletSubspaceBelief(momdp, hidden_state_space, Dirichlet(α′), sᵥ)
 end
 
 update(up::DirichletSubspaceUpdater, distr::Categorical, a, o) = update(up, initialize_belief(up, distr), a, o)
