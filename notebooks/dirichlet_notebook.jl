@@ -7,10 +7,10 @@ using InteractiveUtils
 # ╔═╡ 4624989c-ac25-469f-89b1-a151c3a70148
 begin
 	using Pkg
-	Pkg.develop("BasicPOMCP")
-	Pkg.develop("POMDPPolicies")
-	Pkg.develop("POMDPSimulators")
-	Pkg.develop(path="MOMDPs.jl//")
+	# Pkg.develop("BasicPOMCP")
+	# Pkg.develop("POMDPPolicies")
+	# Pkg.develop("POMDPSimulators")
+	Pkg.develop(path="..//MOMDPs.jl//")
 	using PlutoUI
 	using POMDPModels
 	using POMDPs
@@ -26,11 +26,7 @@ begin
 end
 
 # ╔═╡ f23f5c21-d5e4-4878-b85e-356a7619cf0e
-module Belief
-	using BeliefUpdaters
-	using Parameters
-	include("belief.jl")
-end
+using DirichletBeliefs
 
 # ╔═╡ 5745eb4a-8688-4cc5-a262-d86e60d2ebcf
 using D3Trees
@@ -71,18 +67,6 @@ abstract type _MOMDP{Sv,Sh,A,O} <: POMDP{Tuple{Sv,Sh},A,O} end
 md"""
 # Load `Belief` and `MOMDP`
 """
-
-# ╔═╡ db3c0685-e8ae-416f-b846-bf24f6e49590
-import .Belief:
-	DirichletBelief,
-	uniform_belief,
-	pdf,
-	support,
-	DirichletUpdater,
-	initialize_belief,
-	update,
-	DirichletSubspaceBelief,
-	DirichletSubspaceUpdater; Belief # Trigger.
 
 # ╔═╡ 75c999a2-da6b-40de-a078-901d8d537a47
 md"""
@@ -710,7 +694,6 @@ histogram(rand(b3, 1000))
 # ╠═a141212a-05a7-4888-b118-e83d38ccd47d
 # ╟─e23add73-3c18-4d81-ba3c-4f5472fdde42
 # ╠═f23f5c21-d5e4-4878-b85e-356a7619cf0e
-# ╠═db3c0685-e8ae-416f-b846-bf24f6e49590
 # ╟─75c999a2-da6b-40de-a078-901d8d537a47
 # ╠═ef423c3a-eae8-4211-b4a4-b3cf4b27d7a8
 # ╠═8b5d6571-556c-44fb-b0dd-07d8484c2c88
