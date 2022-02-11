@@ -114,7 +114,7 @@ DirichletSubspaceBelief(momdp::M) where M <: MOMDP = uniform_subspace_belief(mom
 
 function DirichletSubspaceBelief(momdp::M, α::Vector{<:Real}) where M <: MOMDP
     hidden_state_list = ordered_hidden_states(momdp)
-    state_list = MOMDPs.ordered_states(momdp)
+    state_list = ordered_states(momdp)
     α = convert(Vector{Float64}, α)
     b = Dirichlet(α)
     return DirichletSubspaceBelief(momdp, hidden_state_list, state_list, b, nothing)
@@ -126,7 +126,7 @@ function uniform_subspace_belief(momdp::M) where M <: MOMDP
     return DirichletSubspaceBelief(momdp, α)
 end
 
-pdf(b::DirichletSubspaceBelief, s) = normalize(b.b.alpha, 1)[MOMDPs.hiddenstateindex(b.momdp, s)]
+pdf(b::DirichletSubspaceBelief, s) = normalize(b.b.alpha, 1)[hiddenstateindex(b.momdp, s)]
 
 function Random.rand(rng::Random.AbstractRNG, b::DirichletSubspaceBelief)
     i = sample(rng, Weights(normalize(b.b.alpha, 1)))
@@ -181,11 +181,11 @@ function update(up::DirichletSubspaceUpdater, b::DirichletSubspaceBelief, a, o)
     for sₕ in hidden_state_space
         if pdf(b, sₕ) > 0
             s = (sᵥ,sₕ)
-            T = MOMDPs.transitionhidden(momdp, sₕ, a, o)
+            T = transitionhidden(momdp, sₕ, a, o)
 
             for (sp, tp) in weighted_iterator(T)
-                spᵢ = MOMDPs.hiddenstateindex(momdp, sp)
-                op = MOMDPs.obs_weight(momdp, s, a, sp, o)
+                spᵢ = hiddenstateindex(momdp, sp)
+                op = obs_weight(momdp, s, a, sp, o)
                 α′[spᵢ] += op*tp
             end
         end

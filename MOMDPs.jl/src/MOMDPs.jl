@@ -7,12 +7,22 @@ using Random
 
 export
     MOMDP,
+    transitionvisible,
+    transitionhidden,
+    visiblestateindex,
+    hiddenstateindex,
+    visiblestates,
+    hiddenstates,
     visible,
     hidden,
+    visiblestatetype,
+    hiddenstatetype,
+    ordered_visible_states,
     ordered_hidden_states
 
 include("momdp.jl")
-include("gen_impl.jl")
-include("generative.jl")
+include("space.jl")
+include("type_inference.jl")
+include("ordered_spaces.jl")
 
 end # module

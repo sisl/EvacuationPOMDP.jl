@@ -7,9 +7,6 @@ using InteractiveUtils
 # ╔═╡ 4624989c-ac25-469f-89b1-a151c3a70148
 begin
 	using Pkg
-	# Pkg.develop("BasicPOMCP")
-	# Pkg.develop("POMDPPolicies")
-	# Pkg.develop("POMDPSimulators")
 	Pkg.develop(path="..//MOMDPs.jl//")
 	using PlutoUI
 	using POMDPModels
@@ -57,11 +54,15 @@ D = Dirichlet([1,1])
 # ╔═╡ 9f705704-b91e-4b12-8bc8-0a95a093f9ec
 md"""
 # Abstract typing
-> **TODO: _piggyback on POMDP dispatching!_**
 """
 
-# ╔═╡ a141212a-05a7-4888-b118-e83d38ccd47d
-abstract type _MOMDP{Sv,Sh,A,O} <: POMDP{Tuple{Sv,Sh},A,O} end
+# ╔═╡ 3c3a77dc-eb77-4ae9-9c64-88b20d8cbb8a
+MOMDP <: POMDP
+
+# ╔═╡ d9bedb8a-927c-454d-bd97-00899e6b5983
+md"""
+> **TODO**: Merge `MOMDPs` into `POMDPs` so we can call things like `POMDPs.stateshidden` instead of `MOMDPs.stateshidden` and `POMDPs.observations` will not be confused with `MOMDPs.observations`.
+"""
 
 # ╔═╡ e23add73-3c18-4d81-ba3c-4f5472fdde42
 md"""
@@ -287,9 +288,9 @@ o = Observation(visible(s).c, visible(s).t, visible(s).f, AMCIT_DOC) # rand(𝒪
 o.v_doc
 
 # ╔═╡ 46835032-5378-4fe7-9966-e9354e0a64d1
-# function MOMDPs.obs_weight(momdp::TestMOMDP, s, a, sp, o::Observation)
+# function POMDPs.obs_weight(momdp::TestMOMDP, s, a, sp, o::Observation)
 # 	hidden_obs = o.v_doc
-# 	return pdf(MOMDPs.observation(momdp, s, a, sp), hidden_obs)
+# 	return pdf(observation(momdp, s, a, sp), hidden_obs)
 # end
 
 # ╔═╡ 66a7d93c-3dcd-4ff6-aeef-d478d49fadd0
@@ -310,8 +311,15 @@ md"""
 ## Reward
 """
 
+# ╔═╡ f0819505-23cb-44bc-b3c4-7db8dc9ac994
+function POMDPs.reward(m::MOMDP, s::State, a::Action)
+	rh = reward(m, hidden(s), a)
+	rv = reward(m, visible(s), a)
+	return rh*rv
+end
+
 # ╔═╡ f97a3c29-3598-401c-93fb-f1e19ff151ab
-function MOMDPs.reward(m::MOMDP, sh::HiddenState, a::Action)
+function POMDPs.reward(m::MOMDP, sh::HiddenState, a::Action)
 	if sh.v == AMCIT
 		return 500
 	elseif sh.v == SIV
@@ -322,15 +330,8 @@ function MOMDPs.reward(m::MOMDP, sh::HiddenState, a::Action)
 end
 
 # ╔═╡ 7598f6ab-73e0-45b9-b101-a3ddf6deb4e4
-function MOMDPs.reward(m::MOMDP, sv::VisibleState, a::Action)
+function POMDPs.reward(m::MOMDP, sv::VisibleState, a::Action)
 	return sv.f
-end
-
-# ╔═╡ f0819505-23cb-44bc-b3c4-7db8dc9ac994
-function MOMDPs.reward(m::MOMDP, s::State, a::Action)
-	rh = MOMDPs.reward(m, hidden(s), a)
-	rv = MOMDPs.reward(m, visible(s), a)
-	return rh*rv
 end
 
 # ╔═╡ 12611914-ab90-42cb-a83c-4a2e90145203
@@ -348,19 +349,19 @@ MOMDPs.visiblestates(momdp::TestMOMDP) = 𝒮ᵥ
 MOMDPs.hiddenstates(momdp::TestMOMDP) = 𝒮ₕ
 
 # ╔═╡ b903212f-d438-4a3e-b844-bd4a28015783
-MOMDPs.states(momdp::TestMOMDP) = 𝒮
+POMDPs.states(momdp::TestMOMDP) = 𝒮
 
 # ╔═╡ b2f83903-c6e1-41cb-910f-6f38db222b66
-MOMDPs.actions(momdp::TestMOMDP) = [ACCEPT, REJECT]
+POMDPs.actions(momdp::TestMOMDP) = [ACCEPT, REJECT]
 
 # ╔═╡ aef35f4a-e00d-4d8b-b667-93c10761e2f6
-MOMDPs.observations(momdp::TestMOMDP) = 𝒪
+POMDPs.observations(momdp::TestMOMDP) = 𝒪
 
 # ╔═╡ fd4ca58a-33c8-471c-ae91-940906e6202c
-function MOMDPs.observation(momdp::TestMOMDP, s, a, sp)
+function POMDPs.observation(momdp::TestMOMDP, s, a, sp)
 	global documentation
 	p = 0.05 * ones(length(documentation))
-	sₕ_idx = MOMDPs.hiddenstateindex(momdp, sp)
+	sₕ_idx = hiddenstateindex(momdp, sp)
 	p[sₕ_idx] = 1
 	normalize!(p, 1)
 	obs = [Observation(visible(s).c, visible(s).t, visible(s).f, v_doc)
@@ -369,8 +370,8 @@ function MOMDPs.observation(momdp::TestMOMDP, s, a, sp)
 end
 
 # ╔═╡ 4b06ff50-1ab5-4352-8f13-bf58ed2b5ec2
-function MOMDPs.observation(momdp::TestMOMDP, sh::HiddenState)
-	return MOMDPs.observation(momdp, missing, missing, sh)	
+function POMDPs.observation(momdp::TestMOMDP, sh::HiddenState)
+	return observation(momdp, missing, missing, sh)	
 end
 
 # ╔═╡ a8f7c03e-02ea-48b1-a50d-fa24e62afd35
@@ -378,9 +379,9 @@ O = observation(pomdp, 1, 1)
 
 # ╔═╡ 7934c669-23f0-45b1-aa50-2298bf9cbf16
 function MOMDPs.transitionvisible(m::TestMOMDP, sv::VisibleState, a::Action, o=missing)
-	visiblestates = MOMDPs.ordered_visible_states(m)
+	visiblestates = ordered_visible_states(m)
 	p = ones(length(visiblestates))
-	sᵢ = MOMDPs.visiblestateindex(m, sv)
+	sᵢ = visiblestateindex(m, sv)
 	p[sᵢ] = 1
 	normalize!(p, 1)
 	return SparseCat(visiblestates, p)
@@ -389,9 +390,9 @@ end
 
 # ╔═╡ 90c20c89-b7ad-4423-9b6e-440054c22959
 function MOMDPs.transitionhidden(m::TestMOMDP, sh::HiddenState, a::Action, o=missing)
-	hiddenstates = MOMDPs.ordered_hidden_states(m)
+	hiddenstates = ordered_hidden_states(m)
 	p = 0.05*ones(length(hiddenstates))
-	sᵢ = MOMDPs.hiddenstateindex(m, sh)
+	sᵢ = hiddenstateindex(m, sh)
 	p[sᵢ] = 1
 	normalize!(p, 1)
 	return SparseCat(hiddenstates, p)
@@ -399,20 +400,20 @@ function MOMDPs.transitionhidden(m::TestMOMDP, sh::HiddenState, a::Action, o=mis
 end
 
 # ╔═╡ 8fe5b28b-5c91-4264-a4eb-4562d7d17753
-function MOMDPs.transition(m::TestMOMDP, sh::HiddenState, a::Action)
-	return MOMDPs.transitionhidden(m, sh, a) # TODO.
+function POMDPs.transition(m::TestMOMDP, sh::HiddenState, a::Action)
+	return transitionhidden(m, sh, a) # TODO.
 end
 
 # ╔═╡ eea7efec-34e2-429f-a009-b7ff582304d1
-function MOMDPs.transition(m::TestMOMDP, sv::VisibleState, a::Action)
-	return MOMDPs.transitionvisible(m, sv, a) # TODO.
+function POMDPs.transition(m::TestMOMDP, sv::VisibleState, a::Action)
+	return transitionvisible(m, sv, a) # TODO.
 end
 
 # ╔═╡ c58c2fae-d4fd-4349-85c0-e32839f40f08
-function MOMDPs.transition(m::TestMOMDP, s::State, a::Action)
+function POMDPs.transition(m::TestMOMDP, s::State, a::Action)
 	sv = visible(s)
 	sh = hidden(s)
-	t_hidden = MOMDPs.transitionhidden(m, sh, a)
+	t_hidden = transitionhidden(m, sh, a)
 	next_states = []
 	probs = []
 	next_fam = rand(1:8)
@@ -440,24 +441,22 @@ MOMDP
 momdp = TestMOMDP()
 
 # ╔═╡ 04684b69-cb9b-4160-9498-a5b5f155c152
-MOMDPs.stateindex(momdp, s)
+stateindex(momdp, s)
 
 # ╔═╡ f0b97376-b8b1-4a11-bc05-bfddf6ffabc7
-# MOMDPs.visiblestateindex(momdp, MOMDPs.visible(momdp, s))
-MOMDPs.visiblestateindex(momdp, s)
+visiblestateindex(momdp, s)
 
 # ╔═╡ 47666999-a264-4791-855a-6edb7db74563
-findfirst(map(sv->sv == hidden(s), MOMDPs.visiblestates(momdp)))
+findfirst(map(sv->sv == hidden(s), visiblestates(momdp)))
 
 # ╔═╡ 6f53f391-041a-47f2-bbaf-a6a7cb988842
-# MOMDPs.hiddenstateindex(momdp, MOMDPs.hidden(momdp, s))
-MOMDPs.hiddenstateindex(momdp, s)
+hiddenstateindex(momdp, s)
 
 # ╔═╡ 8b80bfe2-a104-4b35-9f4a-2cf2f2c94d13
-MOMDPs.actionindex(momdp, ACCEPT)
+actionindex(momdp, ACCEPT)
 
 # ╔═╡ 0009ca5c-0fe5-4465-a8f4-328916e2fc80
-a = rand(MOMDPs.actions(momdp))
+a = rand(actions(momdp))
 
 # ╔═╡ d9f6e366-d63b-4be9-97f7-b8d14a01da92
 (s,a,sp,o)
@@ -466,67 +465,67 @@ a = rand(MOMDPs.actions(momdp))
 (s,a)
 
 # ╔═╡ 632a8bfd-abb4-4a0c-8c93-08fc77243e75
-MOMDPs.obsindex(momdp, o)
+obsindex(momdp, o)
 
 # ╔═╡ 14225602-6119-4b57-88d5-16c2817b17b2
-MOMDPs.observation(momdp, s, a, sp)
+observation(momdp, s, a, sp)
 
 # ╔═╡ 34f7d327-78a2-4c03-882f-b374ea8c1b4c
-MOMDPs.obs_weight(momdp, s, a, sp, o)
+obs_weight(momdp, s, a, sp, o)
 
 # ╔═╡ f51dab78-dfca-420e-a06a-341d335c5992
-pdf(MOMDPs.observation(momdp, s, a, sp), o)
+pdf(observation(momdp, s, a, sp), o)
 
 # ╔═╡ b4c03954-be46-41a4-8d08-920d7a30124a
-MOMDPs.transition(momdp, s, a)
+transition(momdp, s, a)
 
 # ╔═╡ 80d236e6-84c1-4b66-a14d-317efc10ea1a
-MOMDPs.transitionhidden(momdp, hidden(s), a, o)
+transitionhidden(momdp, hidden(s), a, o)
 
 # ╔═╡ eaf0bc9d-cc9a-4d2c-9a15-6a9dc90ce87c
-MOMDPs.transitionvisible(momdp, visible(s), ACCEPT, o)
+transitionvisible(momdp, visible(s), ACCEPT, o)
 
 # ╔═╡ 0ad927f8-504b-4932-9715-767e2eb06f5f
-MOMDPs.@gen(:sp, :o, :r)(momdp, s, a)
+@gen(:sp, :o, :r)(momdp, s, a)
 
 # ╔═╡ 8c95dbaf-3156-4ed7-adbe-7754f5fd1d36
-MOMDPs.reward(momdp, s, a)
+reward(momdp, s, a)
 
 # ╔═╡ 3bf57fd8-5ae8-435b-b6a6-c34878259de6
-MOMDPs.statetype(momdp)
+statetype(momdp)
 
 # ╔═╡ bf61582b-4cd4-49f8-bbfc-b33f30d34cac
-MOMDPs.visiblestatetype(momdp)
+visiblestatetype(momdp)
 
 # ╔═╡ 4bf1f6e9-dab6-41a7-8b41-8ddd68ba6e36
-MOMDPs.hiddenstatetype(momdp)
+hiddenstatetype(momdp)
 
 # ╔═╡ 505b9e0f-0119-4d19-941f-24f3dde4d94e
-BasicPOMCP.MOMDPs.actiontype(momdp)
+actiontype(momdp)
 
 # ╔═╡ 96e18524-f17b-4693-b2ec-71da8bd659ab
-MOMDPs.obstype(momdp)
+obstype(momdp)
 
 # ╔═╡ 962b44e3-dcc4-4767-b7e9-2a62ee49e42f
-MOMDPs.states(momdp) |> length
+states(momdp) |> length
 
 # ╔═╡ 65621624-fb6d-4815-b5fa-c04e37e9125e
-MOMDPs.visiblestates(momdp) |> length
+visiblestates(momdp) |> length
 
 # ╔═╡ e3bb33f0-613b-457d-a734-7591ad3bcbe1
-MOMDPs.hiddenstates(momdp) |> length
+hiddenstates(momdp) |> length
 
 # ╔═╡ b9deab74-3621-4a25-b5a1-45a9797a4e2e
-MOMDPs.actions(momdp) |> length
+actions(momdp) |> length
 
 # ╔═╡ 48b4f51f-607c-477e-b54d-6136e3439105
-MOMDPs.observations(momdp) |> length
+observations(momdp) |> length
 
 # ╔═╡ 3c58cb0c-0216-49b7-af8a-2ee3f344618f
-MOMDPs.ordered_hidden_states(momdp)
+ordered_hidden_states(momdp)
 
 # ╔═╡ b9620f6b-7b9e-474b-8037-0661ef49f493
-MOMDPs.ordered_visible_states(momdp)
+ordered_visible_states(momdp)
 
 # ╔═╡ b139bd6c-e275-43b6-83be-5fb9095eb0fb
 md"""
@@ -534,10 +533,10 @@ md"""
 """
 
 # ╔═╡ 663c3b94-da44-4102-b18b-b40d7b8033c3
-MOMDPs.isterminal(m::TestMOMDP, s::State) = visible(s).t == 0 || visible(s).c == 0
+POMDPs.isterminal(m::TestMOMDP, s::State) = visible(s).t == 0 || visible(s).c == 0
 
 # ╔═╡ 81a40b69-b994-4a93-960c-1b0a4a4aeced
-MOMDPs.discount(m::TestMOMDP) = 0.95
+POMDPs.discount(m::TestMOMDP) = 0.95
 
 # ╔═╡ bc1d8d7f-41e7-42ba-94e2-2c2526060d6b
 md"""
@@ -550,20 +549,14 @@ updater(momdp::TestMOMDP) = DirichletSubspaceUpdater(momdp)
 # ╔═╡ dd3c1106-7790-4e06-acf0-af3e59c34b32
 solver = POMCPSolver(c=100)
 
-# ╔═╡ f2ab4fff-ac2e-447e-a7d3-916054317994
-sv = visible(s)
-
-# ╔═╡ 92fdfab4-5cae-46d6-a8e8-bda660ea4a9c
-POMDPPolicies.solve(solver::POMDPPolicies.RandomSolver, problem::MOMDP) = RandomPolicy(solver.rng, problem, NothingUpdater())
-
 # ╔═╡ 9c05ba46-bd4f-4bf8-afb5-38ea470440f6
 policy = solve(solver, momdp)
 
-# ╔═╡ 0cf4ae77-936b-4688-b425-59b869485b68
-MOMDPs.actiontype(policy.problem)
+# ╔═╡ f2ab4fff-ac2e-447e-a7d3-916054317994
+sv = visible(s)
 
-# ╔═╡ 216b6302-6d42-45f3-a11b-57faedb02d31
-BasicPOMCP.MCTS.convert_to_policy(s::Solver, momdp::MOMDP) = solve(s, momdp)
+# ╔═╡ 0cf4ae77-936b-4688-b425-59b869485b68
+actiontype(policy.problem)
 
 # ╔═╡ 292f2aa1-b100-4f79-bb77-c3a08c0e5312
 md"""
@@ -610,10 +603,10 @@ end
 # ╔═╡ d2d82fc4-220a-4db6-88a9-6b9b277f1bfc
 # for sh in bₘ′.hidden_state_list
 # 	s = (sv, sh)
-# 	T = MOMDPs.transitionhidden(momdp, sh, a, o)
+# 	T = transitionhidden(momdp, sh, a, o)
 # 	for (sp, tp) in weighted_iterator(T)
-# 		spi = MOMDPs.hiddenstateindex(momdp, sp)
-# 		op = MOMDPs.obs_weight(momdp, s, a, sp, o)
+# 		spi = hiddenstateindex(momdp, sp)
+# 		op = obs_weight(momdp, s, a, sp, o)
 # 		# @info (s, a, sp, o)
 # 		# @info op
 # 	end
@@ -646,7 +639,7 @@ end
 plot(b′.b, collect(1:5))
 
 # ╔═╡ 8876bf9a-5de9-4443-9705-c076e11ca160
-plot(bₘ′.b, map(sₕ->replace(string(sₕ), r"Main.workspace#\d+\."=>""), MOMDPs.hiddenstates(momdp)); c=[:forestgreen :gray :crimson])
+plot(bₘ′.b, map(sₕ->replace(string(sₕ), r"Main.workspace#\d+\."=>""), hiddenstates(momdp)); c=[:forestgreen :gray :crimson])
 
 # ╔═╡ c8595056-ac88-4173-a082-7f5666bb6ae5
 begin
@@ -691,7 +684,8 @@ histogram(rand(b3, 1000))
 # ╠═7e599ef3-66d4-423e-b213-70acdd9eb7ed
 # ╠═c392e215-afdd-46ed-b175-1407ff4c9669
 # ╟─9f705704-b91e-4b12-8bc8-0a95a093f9ec
-# ╠═a141212a-05a7-4888-b118-e83d38ccd47d
+# ╠═3c3a77dc-eb77-4ae9-9c64-88b20d8cbb8a
+# ╟─d9bedb8a-927c-454d-bd97-00899e6b5983
 # ╟─e23add73-3c18-4d81-ba3c-4f5472fdde42
 # ╠═f23f5c21-d5e4-4878-b85e-356a7619cf0e
 # ╟─75c999a2-da6b-40de-a078-901d8d537a47
@@ -815,8 +809,6 @@ histogram(rand(b3, 1000))
 # ╠═f2ab4fff-ac2e-447e-a7d3-916054317994
 # ╠═311e3a11-59c1-4e08-8e3d-fbc46bb88659
 # ╠═0cf4ae77-936b-4688-b425-59b869485b68
-# ╠═216b6302-6d42-45f3-a11b-57faedb02d31
-# ╠═92fdfab4-5cae-46d6-a8e8-bda660ea4a9c
 # ╟─292f2aa1-b100-4f79-bb77-c3a08c0e5312
 # ╠═84292e01-8b4f-4bba-918e-6df49eea410f
 # ╠═fa4cf7f0-e739-477b-98bd-a6d9133870d3

@@ -1,4 +1,4 @@
-# Prioritizing Emergency Evacuations Using POMDPs: A Case Study of the Afhganistan Evacuation
+# Prioritizing Emergency Evacuations using POMDPs: A Case Study of the Afhganistan Evacuation
 2022 IEEE GHTC Conference Submission.
 
 Info in Overleaf: 
