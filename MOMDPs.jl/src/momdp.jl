@@ -30,3 +30,14 @@ POMDPs.actionindex(m::MOMDP, a) = findfirst(map(a′->a′ == a, POMDPs.actions(
 
 """obsindex(problem::MOMDP, o)"""
 POMDPs.obsindex(m::MOMDP, o) = findfirst(map(o′->o′ == o, POMDPs.observations(m)))
+
+
+# POMDPModelTools.jl
+"""
+    obs_weight(pomdp, sh, a, sp, o)
+
+Return a weight proportional to the likelihood of receiving observation o from state sp (and a and s if they are present).
+
+This is a useful shortcut for particle filtering so that the observation distribution does not have to be represented.
+"""
+POMDPModelTools.obs_weight(p::MOMDP, sh, a, shp, o) = pdf(observation(p, sh, a, shp), o)

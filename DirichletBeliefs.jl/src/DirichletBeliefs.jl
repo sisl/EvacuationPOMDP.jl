@@ -25,4 +25,15 @@ export
 
 include("dirichlet.jl")
 
+export
+    DiscreteSubspaceBelief,
+    uniform_belief,
+    pdf,
+    support,
+    DiscreteSubspaceUpdater,
+    initialize_belief,
+    update
+
+include("discrete.jl")
+
 end # module

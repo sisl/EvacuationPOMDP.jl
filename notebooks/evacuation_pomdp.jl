@@ -4,10 +4,21 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ e2772773-4058-4a1b-9f99-d197942086d5
 begin
 	# This causes Pluto to no longer automatically manage packages (so you'll need to install each of these in the Julia REPL)
 	# But, this is needed to use the two local packages MOMDPs and DirichletBeliefs
+	using Revise
 	using Pkg
 	Pkg.develop(path="..//MOMDPs.jl") 
 	Pkg.develop(path="..//DirichletBeliefs.jl") 
@@ -32,6 +43,9 @@ end
 
 # ╔═╡ 30028219-7ea5-4b78-b0df-b3b98b25ee65
 using PlutoUI
+
+# ╔═╡ 2188b608-8797-404a-9ea4-806e7422431b
+using LaTeXStrings
 
 # ╔═╡ 05870354-856b-4342-8dce-00219b602342
 using BasicPOMCP
@@ -102,7 +116,11 @@ end
 		AMCIT => reward_AMCIT,
 	)
 	
-	visa_prob = [num_ISIS/num_total_airport, num_ISIS/num_total_airport, num_ISIS/num_total_airport, num_ISIS/num_total_airport, num_ISIS/num_total_airport] 
+	visa_prob = normalize([num_ISIS/num_total_airport,
+		         num_Vulnerable_Afghan/num_total_airport,
+		         num_P1P2_Afghan/num_total_airport,
+		         num_SIV/num_total_airport,
+		         num_AMCIT/num_total_airport], 1)
     # -2, -1, 0, 1, 2 for other reward structure. 
 
 
@@ -198,17 +216,28 @@ md"""
 """
 
 # ╔═╡ 2dbe879c-ea53-40fb-a334-5cb8f254faf7
-R(s::MDPState, a::Action) = R(s.v, s.f, a)
+R(s::MDPState, a::Action) = R(s.c, s.t, s.f, s.v, a)
 
 # ╔═╡ 351d84fe-76a4-4995-b07f-6c5279ce629f
-function R(v::VisaStatus, f::Int, a::Action)
+function R(c::Int, t::Int, f::Int, v::VisaStatus, a::Action)
 	# reward is just the visa status times family size i think! 
-    if a == ACCEPT
+    if t ≤ 0 || c ≤ 0 # TODO: isterminal
+		return -abs(c) # penalize overflow and underflow.
+	elseif a == ACCEPT
         return params.visa_status_lookup[v]*f
 	else
-		return 0
+		return -sqrt(params.time-t) # 0
 	end
 end
+
+# ╔═╡ b5164cb4-7e74-4536-9125-a0732a860690
+R(10, 50, 1, AMCIT, REJECT)
+
+# ╔═╡ 9abfcc56-ddbd-4670-8e24-b2472cf35676
+@bind current_time Slider(0:120, default=120, show_value=true)
+
+# ╔═╡ 91217d58-7d5b-4559-ba0d-6f07e204ade7
+-sqrt(params.time - current_time)
 
 # ╔═╡ dfb98cff-a786-4174-bc43-0fd22eec29bd
 md"""
@@ -503,6 +532,39 @@ afghan_green = colorant"#007a36";
 # ╔═╡ 87bf7bda-81d5-4325-9f4b-c8e8f6af243a
 cmap = ColorScheme([afghan_red, afghan_green])
 
+# ╔═╡ d1646d70-426d-4545-ba31-25a7712fe852
+md"""
+# Claim models
+(individual observation models)
+> TODO: Revisit "lying", "honesty"
+"""
+
+# ╔═╡ 3c353487-26a2-4c8d-85ee-61a8fd3f9339
+params.visa_status_lookup
+
+# ╔═╡ cbdedb5c-647c-45f1-8287-e25abbf9b2d0
+p_amcit = normalize([0, 0, 0, 0.0, 1.0], 1)
+
+# ╔═╡ 194dbc5b-80a6-49bb-abb6-3eb21d304f42
+dot(p_amcit, [-500, -3, 1, 5, 20])
+
+# ╔═╡ 9babaea3-5ed9-4349-ba5b-95f9549213eb
+md"""
+$O(obs \mid s)$
+"""
+
+# ╔═╡ 178629dc-b0c2-4e43-a5f0-935b554e4ff9
+p_siv = normalize([0, 0, 0, 0.99, 0.01], 1)
+
+# ╔═╡ bf2a07d8-002b-42b3-8483-7ba2533815d8
+p_p1p2 = normalize([0, 0, 0.95, 0.04, 0.01], 1)
+
+# ╔═╡ 7ae07ad8-8aca-426b-8b32-4eea6a9f422d
+p_afghan = normalize([0, 0.9, 0.15, 0.045, 0.005], 1)
+
+# ╔═╡ aee6d6f4-b65e-4775-883b-193424692334
+p_isis = normalize([0.01, 0.94, 0.04, 0.009, 0.001], 1)
+
 # ╔═╡ c07c44c9-866d-4e95-8c24-6a5f96b2a57c
 md"""
 ## Visualizations
@@ -561,7 +623,7 @@ md"""
 
 # ╔═╡ 621e43d5-39da-4fd5-8f4b-6cd5fb18d0d5
 # turn probabilities into counts 
-𝒟₀ = Dirichlet(round.(normalize(params.visa_prob, 1) .* 100))
+𝒟₀ = Dirichlet(round.(normalize(params.visa_prob, 1) .* 100) .+ 1)
 
 # ╔═╡ a9e85360-3add-42d9-82c6-fe66bf506811
 # Plot Dirichlet distribution counts over each provided category.
@@ -576,6 +638,9 @@ function Plots.plot(𝒟::Dirichlet, categories::Vector, cmap; kwargs...)
 		kwargs...
 	)
 end
+
+# ╔═╡ c53d06e3-a3f3-446b-bd33-32317fdbbe08
+plot(map(t->-sqrt(params.time-t), 120:-1:0), xlabel="time left")
 
 # ╔═╡ 6679eb9a-164d-4602-9d2f-0569b0018144
 function vis_all(policy)
@@ -611,6 +676,40 @@ cmap_bar = ColorScheme([afghan_red, colorant"lightgray", afghan_green])
 
 # ╔═╡ ea0311f8-5752-41e3-9dab-a1e35d5e733b
 visa_statuses = ["ISIS-K", "Afghan", "P1/P2 Afghan", "SIV", "AMCIT"] # NOTE: ordering
+
+# ╔═╡ 5405e0bd-5d5d-4133-a318-5087f72ec872
+function plot_lying(p; kwargs...)
+	categories = visa_statuses
+	transposed = reshape(categories, (1, length(categories)))
+	p = reshape(p, (1, length(p)))
+	bar(
+	    transposed,
+	    p,
+	    labels = transposed,
+	    bar_width = 1,
+		legend=:outertopright,
+		margin = 3Plots.mm,
+		ylims = (0, 1.1),
+		size = (600,150),
+		c = [get(cmap_bar, i/length(categories)) for i in 1:length(categories)]';
+		kwargs...
+	)
+end
+
+# ╔═╡ c40a65f6-6e2b-407d-b283-ac3e63bfddfd
+plot_lying(p_amcit; title=L"P(v_\mathrm{obs} \mid v=\texttt{AMCIT})")
+
+# ╔═╡ 427aaf58-f86d-4d7b-83a2-43f72a45d4fc
+plot_lying(p_siv; title=L"P(v_\mathrm{obs} \mid v=\texttt{SIV})")
+
+# ╔═╡ c4668fee-626b-4540-8960-8314550d16a4
+plot_lying(p_p1p2; title=L"P(v_\mathrm{obs} \mid v=\texttt{P1/P2})")
+
+# ╔═╡ 0620a248-8c5e-4ceb-bab7-1936ff3a6039
+plot_lying(p_afghan; title=L"P(v_\mathrm{obs} \mid v=\texttt{Afghan})")
+
+# ╔═╡ 16a3fe52-e9e4-4913-9f40-196b9f7b5a80
+plot_lying(p_isis; title=L"P(v_\mathrm{obs} \mid v=\texttt{ISIS})")
 
 # ╔═╡ de3c5a5d-65e0-423e-9eec-7bd4ae61a70d
 params.visa_prob
@@ -697,7 +796,7 @@ end
 validtime(s::Union{MDPState,VisibleState}) = 0 < s.t
 
 # ╔═╡ fca35d50-4bc8-41cc-bf67-54a8f15490de
-validcapacity(s::Union{MDPState,VisibleState}) = 0 ≤ s.c # maybe try back to 0
+validcapacity(s::Union{MDPState,VisibleState}) = 0 < s.c # maybe try back to 0
 
 # ╔═╡ 029a416e-dce4-4027-ad8b-aaa04b87c4ab
 struct HiddenState
@@ -743,6 +842,196 @@ sindex = (pomdp, v) -> findfirst(params.visa_status .== v)
 md"""
 ## Actions
 """
+
+# ╔═╡ 90573690-39ac-45d9-a2f7-e8947eab0be3
+md"""
+## Transition (TODO: reuse)
+"""
+
+# ╔═╡ 944936f1-cf1f-45ef-b016-64cda8197ec1
+# function POMDPs.transition(pomdp::EvacuationPOMDP, sh::HiddenState, a::Action)
+# 	return MOMDPs.transitionhidden(pomdp, sh, a)
+# end
+
+# ╔═╡ 257308b7-c3c5-43cc-98ba-8f8a8306fb61
+md"""
+## Observations
+- how to model "observations"?
+- some sort of documentation?
+- Actual SIV approval number, or SIV processing number.
+- IDEAS: (based on convos...should ask Thomas Billingsley)
+- US Citizen: actual passport, lost passport but say they have one, picture of documents 
+- On a list/check identity against a list 
+- "Take this kid" they say kid's mother is an AMCIT 
+- SIV full verification 
+- SIV applicant number 
+- Signal (e.g. pic of pinapple) rely on to signal because of its relative obscurity (verification happens elsewhwew and need a quick way for a marine to not have to sift through a oacker but look at a token that gives them a good sense...takes a tenth of the time to verify)
+
+"""
+
+# ╔═╡ a081e9f0-1ee6-4c28-9409-c3ce1e190084
+@enum VisaDocument begin
+	ISIS_indicator
+	Afghan_document
+	P1P2Afghan_document
+	SIV_document
+	AMCIT_document
+	NULL_document
+end
+
+# ╔═╡ 79939adc-66c2-4f3f-8a94-cd38ff01af74
+documentation = [ISIS_indicator, Afghan_document, P1P2Afghan_document, SIV_document, AMCIT_document]
+
+# ╔═╡ 5628373b-b217-47c2-bc79-3d436c3c57b8
+struct Observation
+	c::Int
+	t::Int
+	f::Int
+	vdoc::VisaDocument
+end
+
+# ╔═╡ be4772d2-8413-4cf3-8c36-a6cb76bbc59d
+begin
+	𝒪 = [Observation(c,t,f,vdoc)
+			for c in 0:params.capacity
+				for t in 0:params.time
+					for f in params.family_sizes
+						for vdoc in documentation]
+	length(𝒪)
+end
+
+# ╔═╡ 18a6f1e2-5ee2-40b2-8861-9e634a74de3a
+md"""
+## Observation function
+The observation function models the likelihood of an observation $o$ given the next state $s'$, $O(o \mid s')$.
+
+$$\begin{align*}
+O(o_\text{ISIS} \mid s'_\text{ISIS}) &= x\%\\
+O(o_\text{Afhgan} \mid s'_\text{Afghan}) &= x\%\\
+O(o_\text{P1/P2 Afhgan} \mid s'_\text{P1/P2 Afghan}) &= x\%\\
+O(o_\text{SIV} \mid s'_\text{SIV}) &= x\%\\
+O(o_\text{AMCIT} \mid s'_\text{AMCIT}) &= x\%
+\end{align*}$$
+"""
+
+# ╔═╡ b2aef310-148f-4386-a41e-ead3c32f6ca4
+md"""
+- then try a bunch of free online solvers. Solve with a few online solvers and compare.
+- Each have their own drawbacks. 
+- Solving MDP w/ value iteration guaranteed to give optimal...With perfect information vs. realistic partially observable.
+"""
+
+# ╔═╡ 40ab3b5e-6dff-4881-9919-45aad74b0c71
+global NOISY = false
+
+# ╔═╡ ffc7c1cb-9e08-42ce-9b7c-dfd497125b6d
+NOISE = 0.05
+
+# ╔═╡ cae0c4b1-556a-432c-81cb-0564646d2a32
+p_amcit
+
+# ╔═╡ 2dbbb052-07d8-4de4-8566-7662682b7a45
+p_siv
+
+# ╔═╡ c49a6c2f-1390-4962-bc81-2a94c701c7a7
+p_p1p2
+
+# ╔═╡ e446e5b4-33aa-4aa9-a1d7-244ac8d9f8ab
+p_afghan
+
+# ╔═╡ 51bcdac2-6985-4422-9f6d-336e805ca492
+p_isis
+
+# ╔═╡ 56c51f5d-f632-4afe-8e10-32ef28160f48
+begin
+	sh_test = HiddenState(AMCIT)
+	shp_test = HiddenState(P1P2Afghan)
+	o_test = Observation(1,1,1,AMCIT_document)
+end;
+
+# ╔═╡ f5b3646a-071b-4e7e-8085-d33772cc26ca
+# observation(pomdp, rand(𝒮ₕ), ACCEPT, rand(𝒮ₕ))
+
+# ╔═╡ 65d3f8d8-770e-46a4-933c-d29928b337ed
+o_test
+
+# ╔═╡ f66f2579-d2d4-4a5b-9805-4922dbb99e9b
+md"""
+## POMDP type
+"""
+
+# ╔═╡ 810354f9-c28b-4d82-a05b-12fe2636022c
+struct EvacuationPOMDP <: MOMDP{VisibleState, HiddenState, Action, Observation} end
+
+# ╔═╡ d1abf4d0-a794-4146-abbb-ceaeae769a33
+MOMDPs.visiblestates(pomdp::EvacuationPOMDP) = 𝒮ᵥ
+
+# ╔═╡ 0266dfb4-788a-4c2f-870d-84810f73c9fb
+MOMDPs.hiddenstates(pomdp::EvacuationPOMDP) = 𝒮ₕ
+
+# ╔═╡ 5fd0ddce-3a1b-4bd0-89e1-7d328dd7212f
+POMDPs.states(pomdp::EvacuationPOMDP) = 𝒮_pomdp
+
+# ╔═╡ 1cf30637-81ee-491b-96d1-9996ed0d3347
+POMDPs.initialstate(pomdp::EvacuationPOMDP) = Deterministic(POMDPState((VisibleState(params.capacity, params.time, 3), HiddenState(SIV))))
+
+# ╔═╡ a9674df8-913b-402c-bcd0-b31f4f1f3fcc
+POMDPs.actions(pomdp::EvacuationPOMDP) = [ACCEPT, REJECT]
+
+# ╔═╡ 05bd12b0-3809-4858-bf57-d583b25e6815
+function MOMDPs.transitionvisible(pomdp::EvacuationPOMDP, sv::VisibleState, a::Action, o=missing)
+	visiblestates = ordered_visible_states(pomdp)
+	p = ones(length(visiblestates))
+	sᵢ = visiblestateindex(pomdp, sv)
+	p[sᵢ] = 1
+	normalize!(p, 1)
+	return SparseCat(visiblestates, p)
+	# return Distribution T(v′ | s, a)
+end
+
+# ╔═╡ 86f4190a-621c-4443-a92d-b6c3b57c51b4
+function MOMDPs.transitionhidden(pomdp::EvacuationPOMDP, sh::HiddenState, a::Action, o=missing)
+	hiddenstates = ordered_hidden_states(pomdp)
+	p = 0.05*ones(length(hiddenstates))
+	sᵢ = hiddenstateindex(pomdp, sh)
+	p[sᵢ] = 1
+	normalize!(p, 1)
+	return SparseCat(hiddenstates, p)
+	# return Distribution T(h′ | s, a, v′)
+end
+
+# ╔═╡ ad638eef-1302-4ffd-9450-7bbc24654110
+POMDPs.observations(pomdp::EvacuationPOMDP) = 𝒪
+
+# ╔═╡ f00bbcde-bc67-4b66-b9db-2b46a6ae81e6
+function POMDPs.observation(pomdp::EvacuationPOMDP,
+	                        sh::HiddenState, a::Action, shp::HiddenState)
+	global documentation
+	if NOISY
+		p = NOISE * ones(length(documentation))
+	else
+		p = zeros(length(documentation)) # NOISELESS
+	end		
+	sₕ_idx = hiddenstateindex(pomdp, shp) # NOTE
+	if isnothing(sₕ_idx) # null state
+		return Deterministic(NULL_document)
+	else
+		p[sₕ_idx] = 1
+		obs = copy(documentation)
+
+		# Handle null case
+		push!(obs, NULL_document)
+		push!(p, 1e-100)
+
+		normalize!(p, 1)
+		return SparseCat(obs, p)
+	end
+end
+
+# ╔═╡ 85d69241-3bac-4839-91eb-107583100336
+function MOMDPs.visible(pomdp::EvacuationPOMDP, o::Observation)
+	return VisibleState(o.c, o.t, o.f)
+end
 
 # ╔═╡ 8cf33e98-9c75-4208-a99b-db9758f34d15
 validtime(s::POMDPState) = validtime(visible(s))
@@ -831,92 +1120,8 @@ function experiments()
     end
 end
 
-# ╔═╡ 90573690-39ac-45d9-a2f7-e8947eab0be3
-md"""
-## Transition (TODO: reuse)
-"""
-
-# ╔═╡ 257308b7-c3c5-43cc-98ba-8f8a8306fb61
-md"""
-## Observations
-- how to model "observations"?
-- some sort of documentation?
-- Actual SIV approval number, or SIV processing number.
-- IDEAS: (based on convos...should ask Thomas Billingsley)
-- US Citizen: actual passport, lost passport but say they have one, picture of documents 
-- On a list/check identity against a list 
-- "Take this kid" they say kid's mother is an AMCIT 
-- SIV full verification 
-- SIV applicant number 
-- Signal (e.g. pic of pinapple) rely on to signal because of its relative obscurity (verification happens elsewhwew and need a quick way for a marine to not have to sift through a oacker but look at a token that gives them a good sense...takes a tenth of the time to verify)
-
-"""
-
-# ╔═╡ a081e9f0-1ee6-4c28-9409-c3ce1e190084
-@enum VisaDocument begin
-	ISIS_indicator
-	Afghan_document
-	P1P2Afghan_document
-	SIV_document
-	AMCIT_document
-end
-
-# ╔═╡ 79939adc-66c2-4f3f-8a94-cd38ff01af74
-documentation = [ISIS_indicator, Afghan_document, P1P2Afghan_document, SIV_document, AMCIT_document]
-
-# ╔═╡ 5628373b-b217-47c2-bc79-3d436c3c57b8
-struct Observation
-	c::Int
-	t::Int
-	f::Int
-	vdoc::VisaDocument
-end
-
-# ╔═╡ be4772d2-8413-4cf3-8c36-a6cb76bbc59d
-begin
-	𝒪 = [Observation(c,t,f,vdoc)
-			for c in 0:params.capacity
-				for t in 0:params.time
-					for f in params.family_sizes
-						for vdoc in documentation]
-	length(𝒪)
-end
-
-# ╔═╡ 18a6f1e2-5ee2-40b2-8861-9e634a74de3a
-md"""
-## Observation function
-The observation function models the likelihood of an observation $o$ given the next state $s'$, $O(o \mid s')$.
-
-$$\begin{align*}
-O(o_\text{ISIS} \mid s'_\text{ISIS}) &= x\%\\
-O(o_\text{Afhgan} \mid s'_\text{Afghan}) &= x\%\\
-O(o_\text{P1/P2 Afhgan} \mid s'_\text{P1/P2 Afghan}) &= x\%\\
-O(o_\text{SIV} \mid s'_\text{SIV}) &= x\%\\
-O(o_\text{AMCIT} \mid s'_\text{AMCIT}) &= x\%
-\end{align*}$$
-"""
-
-# ╔═╡ b2aef310-148f-4386-a41e-ead3c32f6ca4
-md"""
-- then try a bunch of free online solvers. Solve with a few online solvers and compare.
-- Each have their own drawbacks. 
-- Solving MDP w/ value iteration guaranteed to give optimal...With perfect information vs. realistic partially observable.
-"""
-
-# ╔═╡ 810354f9-c28b-4d82-a05b-12fe2636022c
-struct EvacuationPOMDP <: MOMDP{VisibleState, HiddenState, Action, Observation} end
-
-# ╔═╡ d1abf4d0-a794-4146-abbb-ceaeae769a33
-MOMDPs.visiblestates(pomdp::EvacuationPOMDP) = 𝒮ᵥ
-
-# ╔═╡ 0266dfb4-788a-4c2f-870d-84810f73c9fb
-MOMDPs.hiddenstates(pomdp::EvacuationPOMDP) = 𝒮ₕ
-
-# ╔═╡ 5fd0ddce-3a1b-4bd0-89e1-7d328dd7212f
-POMDPs.states(pomdp::EvacuationPOMDP) = 𝒮_pomdp
-
-# ╔═╡ a9674df8-913b-402c-bcd0-b31f4f1f3fcc
-POMDPs.actions(pomdp::EvacuationPOMDP) = [ACCEPT, REJECT]
+# ╔═╡ 93dfa811-4280-4f32-8161-b64df94c4520
+validcapacity(POMDPState((VisibleState(0, 1, 1), HiddenState(AMCIT))))
 
 # ╔═╡ 0d06eb82-acdc-4956-8a9b-3a1261f4c00b
 #***** ENUMERATING OVER ALL STATES ******
@@ -926,41 +1131,45 @@ function POMDPs.transition(pomdp::EvacuationPOMDP, s::POMDPState, a::Action)
 	next_states = AbstractState[]
     probabilities = Float64[] 
     
-    if !validtime(sv)
-        push!(next_states,params.null_state)
+    if !validtime(sv) || !validcapacity(sv)
+        push!(next_states, null_pomdp_state)
         push!(probabilities, 1) # double check 
     else
         if a == ACCEPT
 			# check if valid capacity
+			visa_status = sh.v
             next_state_accept = POMDPState(
-				(VisibleState(sv.c - sv.f, sv.t - 1, 1), HiddenState(NULL)))
-            if !validcapacity(next_state_accept) 
+				(VisibleState(sv.c - sv.f, sv.t - 1, 1), HiddenState(visa_status)))
+            next_state_reject = POMDPState(
+				(VisibleState(sv.c, sv.t - 1, 1), HiddenState(visa_status)))
+			if !validcapacity(next_state_accept)
 				# no room for full family, so we make prob. 0 to accept and 1 reject
-				prob = [0,1]
+				probabilities = [1,0]
+				next_states = [next_state_accept, next_state_reject]
             else
                 prob = params.accept_prob
-            end
-            for f in 1:length(params.family_sizes)
-                for v in 1:length(params.visa_status)
-                    # if get on plane
-					family_size = params.family_sizes[f]
-					visa_status = params.visa_status[v]
-					svp_accept = VisibleState(sv.c-sv.f, sv.t-1, family_size)
-					shp_accept = HiddenState(visa_status)
-                    sp_accept = POMDPState((svp_accept, shp_accept))
-					push!(next_states, sp_accept)
-					visa_prob = params.visa_prob[v]
-					family_prob = params.family_prob[f]
-                    push!(probabilities, prob[1] * visa_prob * family_prob)
-
-					# if not
-					svp_reject = VisibleState(sv.c, sv.t-1, family_size)
-					shp_reject = HiddenState(visa_status)
-					sp_reject = POMDPState((svp_reject, shp_reject))
-                    push!(next_states, sp_reject)
-                    push!(probabilities, prob[2] * visa_prob * family_prob)
-                end
-            end
+	            for f in 1:length(params.family_sizes)
+	                for v in 1:length(params.visa_status)
+	                    # if get on plane
+						family_size = params.family_sizes[f]
+						visa_status = params.visa_status[v]
+						svp_accept = VisibleState(sv.c-sv.f, sv.t-1, family_size)
+						shp_accept = HiddenState(visa_status)
+	                    sp_accept = POMDPState((svp_accept, shp_accept))
+						push!(next_states, sp_accept)
+						visa_prob = params.visa_prob[v]
+						family_prob = params.family_prob[f]
+	                    push!(probabilities, prob[1] * visa_prob * family_prob)
+	
+						# if not
+						svp_reject = VisibleState(sv.c, sv.t-1, family_size)
+						shp_reject = HiddenState(visa_status)
+						sp_reject = POMDPState((svp_reject, shp_reject))
+	                    push!(next_states, sp_reject)
+	                    push!(probabilities, prob[2] * visa_prob * family_prob)
+	                end
+	            end
+			end
 		else # if reject     
             for f in 1:length(params.family_sizes)
                 for v in 1:length(params.visa_status)
@@ -978,51 +1187,77 @@ function POMDPs.transition(pomdp::EvacuationPOMDP, s::POMDPState, a::Action)
     return SparseCat(next_states, probabilities)
 end
 
-# ╔═╡ 05bd12b0-3809-4858-bf57-d583b25e6815
-function MOMDPs.transitionvisible(pomdp::EvacuationPOMDP, sv::VisibleState, a::Action, o=missing)
-	visiblestates = ordered_visible_states(pomdp)
-	p = ones(length(visiblestates))
-	sᵢ = visiblestateindex(pomdp, sv)
-	p[sᵢ] = 1
-	normalize!(p, 1)
-	return SparseCat(visiblestates, p)
-	# return Distribution T(v′ | s, a)
-end
-
-# ╔═╡ 86f4190a-621c-4443-a92d-b6c3b57c51b4
-function MOMDPs.transitionhidden(pomdp::EvacuationPOMDP, sh::HiddenState, a::Action, o=missing)
-	hiddenstates = ordered_hidden_states(pomdp)
-	p = 0.05*ones(length(hiddenstates))
-	sᵢ = hiddenstateindex(pomdp, sh)
-	p[sᵢ] = 1
-	normalize!(p, 1)
-	return SparseCat(hiddenstates, p)
-	# return Distribution T(h′ | s, a, v′)
-end
-
-# ╔═╡ ad638eef-1302-4ffd-9450-7bbc24654110
-POMDPs.observations(pomdp::EvacuationPOMDP) = 𝒪
-
 # ╔═╡ b755ee40-f5dc-4c65-bcd2-f6c5847a5f05
-function POMDPs.observation(pomdp::EvacuationPOMDP, s, a, sp)
+function POMDPs.observation(pomdp::EvacuationPOMDP,
+	                        s::POMDPState, a::Action, sp::POMDPState)
 	global documentation
-	p = 0.05 * ones(length(documentation))
-	sₕ_idx = hiddenstateindex(pomdp, sp)
-	p[sₕ_idx] = 1
-	normalize!(p, 1)
-	obs = [Observation(visible(s).c, visible(s).t, visible(s).f, vdoc)
-		for vdoc in documentation]
-	return SparseCat(obs, p)
+	sₕ_idx = hiddenstateindex(pomdp, sp) # NOTE
+	if isnothing(sₕ_idx) # null state
+		return Deterministic(
+			Observation(visible(sp).c, visible(sp).t, visible(sp).f, NULL_document))
+	else
+		if NOISY
+			# p = NOISE * ones(length(documentation))
+			if hidden(sp).v == AMCIT
+				p = copy(p_amcit)
+			elseif hidden(sp).v == SIV
+				p = copy(p_siv)
+			elseif hidden(sp).v == P1P2Afghan
+				p = copy(p_p1p2)
+			elseif hidden(sp).v == Afghan
+				p = copy(p_afghan)
+			elseif hidden(sp).v == ISIS
+				p = copy(p_isis)
+			else
+				error("No case for $(hidden(sp).v).")
+			end
+		else
+			p = zeros(length(documentation)) # NOISELESS
+			p[sₕ_idx] = 1
+		end
+		obs = [Observation(visible(sp).c, visible(sp).t, visible(sp).f, vdoc)
+			for vdoc in documentation]
+
+		# Handle null case
+		push!(obs,
+			Observation(visible(sp).c, visible(sp).t, visible(sp).f, NULL_document))
+		push!(p, 1e-100)
+
+		normalize!(p, 1)
+		return SparseCat(obs, p)
+	end
+end
+
+# ╔═╡ 6cc9003e-63e0-47dc-85c0-5b69758daf72
+function POMDPModelTools.obs_weight(p::EvacuationPOMDP, sh, a, shp, o)
+	return pdf(observation(p, sh, a, shp), o.vdoc)
 end
 
 # ╔═╡ 27bd873f-c7b1-4323-99e3-6f6be02eb8b5
 pomdp = EvacuationPOMDP()
 
+# ╔═╡ 8fceeff8-cd27-49b9-acc3-e7ebde859c20
+transition(pomdp, POMDPState((VisibleState(1,120,2), HiddenState(AMCIT))), ACCEPT)
+
+# ╔═╡ 40c84bf1-88c8-47d3-9a5b-6f9308d883e8
+observation(pomdp, sh_test, ACCEPT, shp_test)
+
+# ╔═╡ 198b9497-28d3-41fa-9581-4cec05273a96
+map(sh->obs_weight(pomdp, sh, ACCEPT, HiddenState(NULL), Observation(-1,-1,-1,NULL_document)), ordered_hidden_states(pomdp))
+
+# ╔═╡ 66c974f1-8f58-4c4a-96fd-fd1ac7aa08aa
+obs_weight(pomdp, sh_test, ACCEPT, shp_test, o_test)
+
 # ╔═╡ 2b4fdacd-067b-4878-91c3-3f1cde1e2d97
-observation(pomdp, rand(𝒮_pomdp), ACCEPT, rand(𝒮_pomdp))
+observation(pomdp, rand(𝒮ₕ), ACCEPT, rand(𝒮ₕ))
 
 # ╔═╡ 4083a989-f196-4b9a-abf2-8f7b34f09168
 transition(pomdp, rand(𝒮_pomdp), ACCEPT)
+
+# ╔═╡ 4f00e4e5-aaad-43de-9f22-e7bf683ecc15
+md"""
+Extract the visible state portion of the observation, and convert it to a `VisibleState`.
+"""
 
 # ╔═╡ 0682719b-e3f4-4d22-9b72-395cf33d8a3d
 md"""
@@ -1031,7 +1266,7 @@ md"""
 
 # ╔═╡ 34b1b547-c5df-49df-b58f-d41ff17b04a9
 function POMDPs.reward(pomdp::EvacuationPOMDP, s::POMDPState, a::Action)
-	return R(hidden(s).v, visible(s).f, a)
+	return R(visible(s).c, visible(s).t, visible(s).f, hidden(s).v, a)
 end
 
 # ╔═╡ 8085e3eb-cd8b-4d57-bfe4-df35c0eae8c1
@@ -1041,7 +1276,7 @@ md"""
 
 # ╔═╡ c4a4bc9e-b7d3-4817-9ed7-807da5f8fd57
 function POMDPs.isterminal(::EvacuationPOMDP, s::POMDPState)
-	return s == null_pomdp_state
+	return s == null_pomdp_state # || !validtime(s) || !validcapacity(s)
 end
 
 # ╔═╡ fbc6ab5c-a2a1-4215-a412-7fe10e43117e
@@ -1052,16 +1287,22 @@ md"""
 ## Generative model
 """
 
+# ╔═╡ 8aeff62d-6c27-4f6b-9b0d-8d18df1c2902
+gen_state = rand(𝒮_pomdp)
+
 # ╔═╡ 0c3d6891-74fc-4d39-a0d4-080d929677f8
-@gen(:sp, :o, :r)(pomdp, rand(𝒮_pomdp), rand(𝒜))
+@gen(:sp, :o, :r)(pomdp, gen_state, REJECT)
 
 # ╔═╡ 96176ef1-2919-41a0-a206-bfe228195ad8
 md"""
-## Beliefs
+## Population beliefs
 """
 
 # ╔═╡ d47c2f84-ca16-4337-80ef-3abd94a77f6a
 prior_belief = Categorical([0.01, 0.50, 0.14, 0.20, 0.15]);
+
+# ╔═╡ 321989f4-7457-42a2-86ea-c5289d323bd4
+normalize(prior_belief.p .* map(sh->obs_weight(pomdp, sh, ACCEPT, sh, o_test), ordered_hidden_states(pomdp)), 1)
 
 # ╔═╡ 453da136-bd07-4e7c-a47a-0bad8765eb7e
 up = DirichletSubspaceUpdater(pomdp)
@@ -1073,8 +1314,8 @@ _b′ = initialize_belief(up, prior_belief)
 begin
 	b′ = initialize_belief(up, prior_belief)
 	sv = VisibleState(params.capacity, params.time, 1)
-	b′(sv) # Important.
-	for num_updates in 1:1
+	# b′(sv)
+	for num_updates in 1:10
 		vdoc = documentation[rand(𝒟_true)]
 		o = Observation(sv.c, sv.t, sv.f, vdoc)
 		b′ = update(up, b′, ACCEPT, o)
@@ -1099,32 +1340,180 @@ md"""
 """
 
 # ╔═╡ 7d540d22-1d52-4eef-a942-b236668217b6
-updater(pomdp::EvacuationPOMDP) = DirichletSubspaceUpdater(pomdp)
+# updater(pomdp::EvacuationPOMDP) = DirichletSubspaceUpdater(pomdp)
+
+# ╔═╡ 7123fa88-ee0e-462a-85e5-c6a7a485ca84
+updater(pomdp::EvacuationPOMDP) = DiscreteSubspaceUpdater(pomdp)
 
 # ╔═╡ 1d3d333b-0e6f-46ff-83d0-fe9af88c8c8f
-pomcp_solver = POMCPSolver()
+pomcp_solver = POMCPSolver(max_depth=1, tree_queries=1500)
 
 # ╔═╡ e1be8687-43db-46e9-99ad-eff59c3c2985
 pomcp_policy = solve(pomcp_solver, pomdp)
 
 # ╔═╡ b618680a-cec0-4efb-981e-65d074b1eb0a
 begin
-	b₀ = initialize_belief(up, prior_belief)
+	# sv₀ = visible(rand(initialstate(pomdp)))
 	sv₀ = VisibleState(params.capacity, params.time, 1)
+	b₀ = initialize_belief(up, prior_belief)
+	b₀(sv₀)
+	# b₀ = DirichletSubspaceBelief(pomdp, sv₀)
+end;
+
+# ╔═╡ 4efe4359-7041-45c9-bedf-939a41954831
+observation(pomdp, POMDPState((sv₀,sh_test)), ACCEPT, POMDPState((sv₀,shp_test)))
+
+# ╔═╡ 37d8c716-128b-4871-a722-f94b867b1cfc
+plot(b₀.b, bar_labels, cmap_bar)
+
+# ╔═╡ fdb3db7f-7784-477f-ace2-b65df9031b41
+md"""
+## Individual beliefs
+"""
+
+# ╔═╡ f7d1d21a-0660-424b-939c-406433b28285
+params.visa_prob
+
+# ╔═╡ 7b748a7d-7583-4918-9e47-27c0d8f0b64b
+individual_updater(pomdp::EvacuationPOMDP) = DiscreteSubspaceUpdater(pomdp)
+
+# ╔═╡ 33beafb5-1fd2-4e0e-892b-1b5b9d2e0a77
+up_indiv = DiscreteSubspaceUpdater(pomdp)
+
+# ╔═╡ 033ecd38-b298-489b-8990-5521d4abfb85
+begin
+	b₀_indiv = initialize_belief(up_indiv, prior_belief)
+	b₀_indiv(sv₀)
+	# b₀ = DirichletSubspaceBelief(pomdp, sv₀)
 end;
 
 # ╔═╡ 85a03af8-4734-48ee-8c6d-a8905e1f2feb
 begin
-	online_action, info =
-		action_info(pomcp_policy, b₀(sv₀), tree_in_info=true)
+	Random.seed!(0)
+	online_action, info = action_info(pomcp_policy, b₀_indiv, tree_in_info=true)
 	online_action
 end
 
 # ╔═╡ 7fdc98bb-0c88-434f-99ed-e7876df3c6e2
 D3Tree(info[:tree], init_expand=1)
 
-# ╔═╡ 37d8c716-128b-4871-a722-f94b867b1cfc
-plot(b₀.b, bar_labels, cmap_bar)
+# ╔═╡ 7538f1b7-0c90-481a-ba73-430510db8d4c
+begin
+	b_indiv = DiscreteSubspaceBelief(pomdp, sv₀)
+end
+
+# ╔═╡ d9f7475d-afb2-4012-9483-07cca631db98
+plot_lying(b_indiv.b)
+
+# ╔═╡ 2ce923be-ed33-47fa-83ee-a798632cb305
+normalize(b_indiv.b .* normalize(b₀.b.alpha, 1), 1) |> plot_lying
+
+# ╔═╡ 3a7066a4-4273-4ac7-8bfe-63e7d54f0f5b
+md"""
+### Updating individual belief
+"""
+
+# ╔═╡ 40a6caa8-7f10-4816-ba65-bb4c49053775
+begin
+	b′_indiv = initialize_belief(up_indiv, prior_belief)
+	sv_indiv = VisibleState(params.capacity, params.time, 1)
+	b′_indiv(sv_indiv)
+	@info "Initial" plot_lying(b′_indiv.b)
+	s_indiv = POMDPState((sv_indiv, HiddenState(NULL)))
+	a_indiv = ACCEPT
+	for num_updates in 1:20
+		global s_indiv, b′_indiv
+		spacing = "\n"^2num_updates
+		# vdoc = documentation[rand(𝒟_true)]
+		# o = Observation(sv.c, sv.t, sv.f, vdoc)
+		sp = rand(transition(pomdp, s_indiv, a_indiv))
+		if isterminal(pomdp, sp)
+			@warn "Terminal!"
+			break
+		end
+		o = rand(observation(pomdp, s_indiv, a_indiv, sp))
+		b′_indiv = update(up_indiv, b′_indiv, a_indiv, o)
+		@info spacing hidden(sp).v o.vdoc plot_lying(b′_indiv.b)
+		s_indiv = sp
+	end
+	# [mean(b′_indiv) b′_indiv.b]
+	plot_lying(b′_indiv.b)
+end
+
+# ╔═╡ f1914e6d-8dd2-4412-af20-93530ef0d030
+md"""
+# Visa probability distribuion
+"""
+
+# ╔═╡ 0d1c09ae-e27d-4d9c-84f4-13c4eca12b43
+plot_lying(params.visa_prob; title="Visa probability distribution")
+
+# ╔═╡ 56d742f1-4fb7-4afe-8674-f343d6672364
+params.visa_prob
+
+# ╔═╡ f429f2b4-959b-4ed2-bd49-6ba961ba2382
+md"""
+# Simulations
+"""
+
+# ╔═╡ ed5c5dfc-883b-44be-9fe1-4d054ee94312
+params.visa_status_lookup
+
+# ╔═╡ e655ae93-24ab-4305-a774-9306f585c6cd
+macro seeprints(expr)
+	quote
+		stdout_bk = stdout
+		rd, wr = redirect_stdout()
+		$expr
+		redirect_stdout(stdout_bk)
+		close(wr)
+		read(rd, String) |> Text
+	end
+end
+
+# ╔═╡ 98a0e66f-5df2-4d43-a4ae-e685d8f32fce
+argmax([0.04, 0.04, 0.83, 0.04, 0.04])
+
+# ╔═╡ 6ba39de1-73dd-48ab-a075-da9937248187
+@seeprints begin
+
+	initial_belief = b₀_indiv # b₀
+	belief_updater = individual_updater(pomdp) # updater
+	s₀ = rand(initialstate(pomdp))
+	initial_belief(visible(s₀))
+	o₀ = rand(observation(pomdp, s₀, REJECT, s₀))
+	initial_belief = update(belief_updater, initial_belief, REJECT, o₀)
+	
+	for (t, (s, a, o, b, sp, r)) in enumerate(stepthrough(pomdp, pomcp_policy,
+		                                                  belief_updater,
+		                                                  initial_belief,
+														  s₀,
+		                                                  "s,a,o,b,sp,r",
+		                                                  max_steps=121))
+        @show t
+		println("Capacity=$(visible(s).c), time remaining=$(visible(s).t)")
+        println(hidden(s).v," of size ", visible(s).f)
+        # @show a
+		if a == ACCEPT
+			println("\t——————ACCEPT—————— ✅")
+		else
+			println("\t(reject) ❌")
+		end
+        @show o
+		@show round.(b.b, digits=3)
+		@show VisaStatus(argmax(b.b) - 1) # 0-based enums
+		if hidden(s).v != VisaStatus(argmax(b.b) - 1)
+			@show "~~~~~ M I S M A T C H ~~~~~"
+			@warn "mismatch ($t)" # Only happens in the noisy case due to sampling
+		end
+        # @show b.visiblestate
+		# @show round.(b.b.alpha, digits=2)
+        println(hidden(sp).v," of size ", visible(sp).f)
+        # @show hidden(sp)
+        @show r
+		println("—"^20)
+	end
+end
 
 # ╔═╡ Cell order:
 # ╠═30028219-7ea5-4b78-b0df-b3b98b25ee65
@@ -1155,6 +1544,10 @@ plot(b₀.b, bar_labels, cmap_bar)
 # ╟─5022c6f3-09f8-44bc-b41e-a86cbf8f787c
 # ╠═2dbe879c-ea53-40fb-a334-5cb8f254faf7
 # ╠═351d84fe-76a4-4995-b07f-6c5279ce629f
+# ╠═b5164cb4-7e74-4536-9125-a0732a860690
+# ╠═9abfcc56-ddbd-4670-8e24-b2472cf35676
+# ╠═91217d58-7d5b-4559-ba0d-6f07e204ade7
+# ╠═c53d06e3-a3f3-446b-bd33-32317fdbbe08
 # ╟─dfb98cff-a786-4174-bc43-0fd22eec29bd
 # ╠═463f720a-f10e-4419-b7fc-84e60b917b9a
 # ╟─55a665bb-85a6-4eb8-bf5f-9ba4ac0783fb
@@ -1198,6 +1591,22 @@ plot(b₀.b, bar_labels, cmap_bar)
 # ╠═b0da5b04-afc3-47b6-8e21-329456c5d7e8
 # ╠═d343e7ac-edc6-469f-9f21-b6d7e42b3e3c
 # ╠═87bf7bda-81d5-4325-9f4b-c8e8f6af243a
+# ╟─d1646d70-426d-4545-ba31-25a7712fe852
+# ╠═2188b608-8797-404a-9ea4-806e7422431b
+# ╠═3c353487-26a2-4c8d-85ee-61a8fd3f9339
+# ╠═194dbc5b-80a6-49bb-abb6-3eb21d304f42
+# ╠═cbdedb5c-647c-45f1-8287-e25abbf9b2d0
+# ╟─9babaea3-5ed9-4349-ba5b-95f9549213eb
+# ╠═c40a65f6-6e2b-407d-b283-ac3e63bfddfd
+# ╠═178629dc-b0c2-4e43-a5f0-935b554e4ff9
+# ╠═427aaf58-f86d-4d7b-83a2-43f72a45d4fc
+# ╠═bf2a07d8-002b-42b3-8483-7ba2533815d8
+# ╠═c4668fee-626b-4540-8960-8314550d16a4
+# ╠═7ae07ad8-8aca-426b-8b32-4eea6a9f422d
+# ╠═0620a248-8c5e-4ceb-bab7-1936ff3a6039
+# ╠═aee6d6f4-b65e-4775-883b-193424692334
+# ╠═16a3fe52-e9e4-4913-9f40-196b9f7b5a80
+# ╠═5405e0bd-5d5d-4133-a318-5087f72ec872
 # ╟─c07c44c9-866d-4e95-8c24-6a5f96b2a57c
 # ╠═39237f4f-6c60-43a5-ab51-abd13f438b9b
 # ╠═6679eb9a-164d-4602-9d2f-0569b0018144
@@ -1232,12 +1641,16 @@ plot(b₀.b, bar_labels, cmap_bar)
 # ╠═d1abf4d0-a794-4146-abbb-ceaeae769a33
 # ╠═0266dfb4-788a-4c2f-870d-84810f73c9fb
 # ╠═5fd0ddce-3a1b-4bd0-89e1-7d328dd7212f
+# ╠═1cf30637-81ee-491b-96d1-9996ed0d3347
 # ╟─d532a9eb-3eda-49c7-b139-7846485c4610
 # ╠═a9674df8-913b-402c-bcd0-b31f4f1f3fcc
 # ╠═8cf33e98-9c75-4208-a99b-db9758f34d15
 # ╠═09919642-7393-4c1f-bf5b-f1edb1f6c87c
+# ╠═93dfa811-4280-4f32-8161-b64df94c4520
 # ╟─90573690-39ac-45d9-a2f7-e8947eab0be3
 # ╠═0d06eb82-acdc-4956-8a9b-3a1261f4c00b
+# ╠═8fceeff8-cd27-49b9-acc3-e7ebde859c20
+# ╠═944936f1-cf1f-45ef-b016-64cda8197ec1
 # ╠═05bd12b0-3809-4858-bf57-d583b25e6815
 # ╠═86f4190a-621c-4443-a92d-b6c3b57c51b4
 # ╟─257308b7-c3c5-43cc-98ba-8f8a8306fb61
@@ -1248,17 +1661,38 @@ plot(b₀.b, bar_labels, cmap_bar)
 # ╠═ad638eef-1302-4ffd-9450-7bbc24654110
 # ╟─18a6f1e2-5ee2-40b2-8861-9e634a74de3a
 # ╟─b2aef310-148f-4386-a41e-ead3c32f6ca4
+# ╠═40ab3b5e-6dff-4881-9919-45aad74b0c71
+# ╠═ffc7c1cb-9e08-42ce-9b7c-dfd497125b6d
 # ╠═b755ee40-f5dc-4c65-bcd2-f6c5847a5f05
+# ╠═cae0c4b1-556a-432c-81cb-0564646d2a32
+# ╠═2dbbb052-07d8-4de4-8566-7662682b7a45
+# ╠═c49a6c2f-1390-4962-bc81-2a94c701c7a7
+# ╠═e446e5b4-33aa-4aa9-a1d7-244ac8d9f8ab
+# ╠═51bcdac2-6985-4422-9f6d-336e805ca492
+# ╠═f00bbcde-bc67-4b66-b9db-2b46a6ae81e6
+# ╠═6cc9003e-63e0-47dc-85c0-5b69758daf72
+# ╠═56c51f5d-f632-4afe-8e10-32ef28160f48
+# ╠═40c84bf1-88c8-47d3-9a5b-6f9308d883e8
+# ╠═4efe4359-7041-45c9-bedf-939a41954831
+# ╠═198b9497-28d3-41fa-9581-4cec05273a96
+# ╠═66c974f1-8f58-4c4a-96fd-fd1ac7aa08aa
+# ╠═321989f4-7457-42a2-86ea-c5289d323bd4
+# ╠═f5b3646a-071b-4e7e-8085-d33772cc26ca
+# ╠═85d69241-3bac-4839-91eb-107583100336
+# ╠═65d3f8d8-770e-46a4-933c-d29928b337ed
+# ╟─f66f2579-d2d4-4a5b-9805-4922dbb99e9b
 # ╠═810354f9-c28b-4d82-a05b-12fe2636022c
 # ╠═27bd873f-c7b1-4323-99e3-6f6be02eb8b5
 # ╠═2b4fdacd-067b-4878-91c3-3f1cde1e2d97
 # ╠═4083a989-f196-4b9a-abf2-8f7b34f09168
+# ╟─4f00e4e5-aaad-43de-9f22-e7bf683ecc15
 # ╟─0682719b-e3f4-4d22-9b72-395cf33d8a3d
 # ╠═34b1b547-c5df-49df-b58f-d41ff17b04a9
 # ╟─8085e3eb-cd8b-4d57-bfe4-df35c0eae8c1
 # ╠═c4a4bc9e-b7d3-4817-9ed7-807da5f8fd57
 # ╠═fbc6ab5c-a2a1-4215-a412-7fe10e43117e
 # ╟─5629a62b-0532-4736-aa8b-e814192ed9c0
+# ╠═8aeff62d-6c27-4f6b-9b0d-8d18df1c2902
 # ╠═0c3d6891-74fc-4d39-a0d4-080d929677f8
 # ╟─96176ef1-2919-41a0-a206-bfe228195ad8
 # ╠═d47c2f84-ca16-4337-80ef-3abd94a77f6a
@@ -1271,10 +1705,29 @@ plot(b₀.b, bar_labels, cmap_bar)
 # ╟─6349762b-1c5e-4b9b-b2eb-90573f19313e
 # ╠═05870354-856b-4342-8dce-00219b602342
 # ╠═7d540d22-1d52-4eef-a942-b236668217b6
+# ╠═7123fa88-ee0e-462a-85e5-c6a7a485ca84
 # ╠═1d3d333b-0e6f-46ff-83d0-fe9af88c8c8f
 # ╠═e1be8687-43db-46e9-99ad-eff59c3c2985
 # ╠═b618680a-cec0-4efb-981e-65d074b1eb0a
+# ╠═033ecd38-b298-489b-8990-5521d4abfb85
 # ╠═85a03af8-4734-48ee-8c6d-a8905e1f2feb
 # ╠═d4d4de96-b8aa-484d-b594-afb48dd472bc
 # ╠═7fdc98bb-0c88-434f-99ed-e7876df3c6e2
 # ╠═37d8c716-128b-4871-a722-f94b867b1cfc
+# ╟─fdb3db7f-7784-477f-ace2-b65df9031b41
+# ╠═f7d1d21a-0660-424b-939c-406433b28285
+# ╠═7b748a7d-7583-4918-9e47-27c0d8f0b64b
+# ╠═33beafb5-1fd2-4e0e-892b-1b5b9d2e0a77
+# ╠═7538f1b7-0c90-481a-ba73-430510db8d4c
+# ╠═d9f7475d-afb2-4012-9483-07cca631db98
+# ╠═2ce923be-ed33-47fa-83ee-a798632cb305
+# ╟─3a7066a4-4273-4ac7-8bfe-63e7d54f0f5b
+# ╠═40a6caa8-7f10-4816-ba65-bb4c49053775
+# ╟─f1914e6d-8dd2-4412-af20-93530ef0d030
+# ╠═0d1c09ae-e27d-4d9c-84f4-13c4eca12b43
+# ╠═56d742f1-4fb7-4afe-8674-f343d6672364
+# ╟─f429f2b4-959b-4ed2-bd49-6ba961ba2382
+# ╠═ed5c5dfc-883b-44be-9fe1-4d054ee94312
+# ╟─e655ae93-24ab-4305-a774-9306f585c6cd
+# ╠═98a0e66f-5df2-4d43-a4ae-e685d8f32fce
+# ╠═6ba39de1-73dd-48ab-a075-da9937248187

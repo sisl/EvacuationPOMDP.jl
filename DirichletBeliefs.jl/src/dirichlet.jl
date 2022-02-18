@@ -109,6 +109,12 @@ function (b::DirichletSubspaceBelief)(sv)
     return b
 end
 
+function DirichletSubspaceBelief(momdp::MOMDP{Sv,Sh,A,O}, sv₀::Sv) where {Sv,Sh,A,O}
+    b = uniform_subspace_belief(momdp)
+    b(sv₀)
+    return b
+end
+
 DirichletSubspaceBelief(momdp::M) where M <: MOMDP = uniform_subspace_belief(momdp)
 
 function DirichletSubspaceBelief(momdp::M, α::Vector{<:Real}) where M <: MOMDP
@@ -173,16 +179,16 @@ function update(up::DirichletSubspaceUpdater, b::DirichletSubspaceBelief, a, o)
     hidden_state_space = b.hidden_state_list
     α = b.b.alpha
     α′ = copy(α)
-    sᵥ = b.visiblestate
+    sᵥ = visible(momdp, o)
 
     for sₕ in hidden_state_space
         if pdf(b, sₕ) > 0
-            s = (sᵥ,sₕ)
+            # s = (sᵥ,sₕ)
             T = transitionhidden(momdp, sₕ, a, o)
 
             for (sp, tp) in weighted_iterator(T)
                 spᵢ = hiddenstateindex(momdp, sp)
-                op = obs_weight(momdp, s, a, sp, o)
+                op = obs_weight(momdp, sₕ, a, sp, o)
                 α′[spᵢ] += op*tp
             end
         end

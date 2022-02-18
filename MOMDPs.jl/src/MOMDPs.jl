@@ -18,7 +18,8 @@ export
     visiblestatetype,
     hiddenstatetype,
     ordered_visible_states,
-    ordered_hidden_states
+    ordered_hidden_states,
+    obs_weight
 
 include("momdp.jl")
 include("space.jl")
