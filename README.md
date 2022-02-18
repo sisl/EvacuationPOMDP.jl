@@ -6,7 +6,7 @@ https://www.overleaf.com/project/61df03a4a582c1465215cb95
 
 ## Notebook
 
-> **Open this in a browswer: <a href="https://htmlview.glitch.me/?https://raw.githubusercontent.com/lisaeinstein/EvacuationPOMDP.jl/main/evacuation_pomdp.jl.html?token=GHSAT0AAAAAABQGNU3U2JBTAJNR7O3IL5RKYQP6DAQ">evacuation_pomdp.jl.html</a>**
+> **Open this in a browswer: <a href="https://htmlview.glitch.me/?https://raw.githubusercontent.com/lisaeinstein/EvacuationPOMDP.jl/main/evacuation_pomdp.jl.html?token=GHSAT0AAAAAABQGNU3VSZHRYWXRSP6HHEFUYQP65GQ">evacuation_pomdp.jl.html</a>**
 
 ## Installation
 
