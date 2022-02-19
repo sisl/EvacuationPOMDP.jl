@@ -4,9 +4,13 @@
 Info in Overleaf: 
 https://www.overleaf.com/project/61df03a4a582c1465215cb95
 
+<p align="center">
+  <img src="./media/trajectory.svg">
+</p>
+
 ## Notebook
 
-> **Open this in a browswer: <a href="https://htmlview.glitch.me/?https://gist.githubusercontent.com/mossr/1e0e451d98f6475f23181dfc09dcffe7/raw/8a55f3ce3584df05b63a86182471ecc25dfe1b65/evacuation_pomdp.jl.html">evacuation_pomdp.jl.html</a>**
+> **Open this in a browswer: <a href="https://htmlview.glitch.me/?https://gist.githubusercontent.com/mossr/1e0e451d98f6475f23181dfc09dcffe7/raw/5c3529be3b5298a32cc20aafc3ac9b854b2ed603/evacuation_pomdp.jl.html">evacuation_pomdp.jl.html</a>**
 
 ## Installation
 

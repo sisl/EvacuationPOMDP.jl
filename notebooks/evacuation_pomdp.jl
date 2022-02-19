@@ -53,6 +53,9 @@ using BasicPOMCP
 # ╔═╡ d4d4de96-b8aa-484d-b594-afb48dd472bc
 using D3Trees
 
+# ╔═╡ ab91d45d-7ded-4386-88b3-a28d2ebe44ff
+using TikzGraphs, Graphs
+
 # ╔═╡ 41d0fe72-b83d-4cf8-bc91-44b0e8f561eb
 TableOfContents()
 
@@ -922,7 +925,10 @@ md"""
 """
 
 # ╔═╡ 40ab3b5e-6dff-4881-9919-45aad74b0c71
-global NOISY = false
+global NOISY = true
+
+# ╔═╡ 6829eb50-5531-4989-a712-329ba8cc1b1d
+OLD_NOISE = false
 
 # ╔═╡ ffc7c1cb-9e08-42ce-9b7c-dfd497125b6d
 NOISE = 0.05
@@ -1007,16 +1013,31 @@ POMDPs.observations(pomdp::EvacuationPOMDP) = 𝒪
 function POMDPs.observation(pomdp::EvacuationPOMDP,
 	                        sh::HiddenState, a::Action, shp::HiddenState)
 	global documentation
-	if NOISY
-		p = NOISE * ones(length(documentation))
-	else
-		p = zeros(length(documentation)) # NOISELESS
-	end		
-	sₕ_idx = hiddenstateindex(pomdp, shp) # NOTE
+	state = shp # NOTE
+	sₕ_idx = hiddenstateindex(pomdp, state)
 	if isnothing(sₕ_idx) # null state
 		return Deterministic(NULL_document)
 	else
-		p[sₕ_idx] = 1
+		if NOISY
+			if OLD_NOISE
+				p = NOISE * ones(length(documentation))
+			else
+				if state.v == AMCIT
+					p = copy(p_amcit)
+				elseif state.v == SIV
+					p = copy(p_siv)
+				elseif state.v == P1P2Afghan
+					p = copy(p_p1p2)
+				elseif state.v == Afghan
+					p = copy(p_afghan)
+				elseif state.v == ISIS
+					p = copy(p_isis)
+				end
+			end
+		else
+			p = zeros(length(documentation)) # NOISELESS
+			p[sₕ_idx] = 1
+		end
 		obs = copy(documentation)
 
 		# Handle null case
@@ -1191,36 +1212,40 @@ end
 function POMDPs.observation(pomdp::EvacuationPOMDP,
 	                        s::POMDPState, a::Action, sp::POMDPState)
 	global documentation
-	sₕ_idx = hiddenstateindex(pomdp, sp) # NOTE
+	state = sp # NOTE
+	sv = visible(state)
+	sh = hidden(state)
+	sₕ_idx = hiddenstateindex(pomdp, state)
 	if isnothing(sₕ_idx) # null state
 		return Deterministic(
-			Observation(visible(sp).c, visible(sp).t, visible(sp).f, NULL_document))
+			Observation(sv.c, sv.t, sv.f, NULL_document))
 	else
 		if NOISY
-			# p = NOISE * ones(length(documentation))
-			if hidden(sp).v == AMCIT
-				p = copy(p_amcit)
-			elseif hidden(sp).v == SIV
-				p = copy(p_siv)
-			elseif hidden(sp).v == P1P2Afghan
-				p = copy(p_p1p2)
-			elseif hidden(sp).v == Afghan
-				p = copy(p_afghan)
-			elseif hidden(sp).v == ISIS
-				p = copy(p_isis)
+			if OLD_NOISE
+				p = NOISE * ones(length(documentation))
 			else
-				error("No case for $(hidden(sp).v).")
+				if sh.v == AMCIT
+					p = copy(p_amcit)
+				elseif sh.v == SIV
+					p = copy(p_siv)
+				elseif sh.v == P1P2Afghan
+					p = copy(p_p1p2)
+				elseif sh.v == Afghan
+					p = copy(p_afghan)
+				elseif sh.v == ISIS
+					p = copy(p_isis)
+				else
+					error("No case for $(sh.v).")
+				end
 			end
 		else
 			p = zeros(length(documentation)) # NOISELESS
 			p[sₕ_idx] = 1
 		end
-		obs = [Observation(visible(sp).c, visible(sp).t, visible(sp).f, vdoc)
-			for vdoc in documentation]
+		obs = [Observation(sv.c, sv.t, sv.f, vdoc) for vdoc in documentation]
 
 		# Handle null case
-		push!(obs,
-			Observation(visible(sp).c, visible(sp).t, visible(sp).f, NULL_document))
+		push!(obs, Observation(sv.c, sv.t, sv.f, NULL_document))
 		push!(p, 1e-100)
 
 		normalize!(p, 1)
@@ -1327,7 +1352,7 @@ end
 bar_labels = map(sₕ->replace(replace(string(sₕ), r"Main.workspace#\d+\."=>""), "HiddenState"=>""), hiddenstates(pomdp))
 
 # ╔═╡ b1f02e06-7131-4de3-9b40-b9d7e87ce99e
-plot(b′.b, bar_labels, cmap_bar)
+Plots.plot(b′.b, bar_labels, cmap_bar)
 
 # ╔═╡ edae2f7c-cd4c-42f6-a423-ad5f1f1bf5cd
 md"""
@@ -1364,7 +1389,7 @@ end;
 observation(pomdp, POMDPState((sv₀,sh_test)), ACCEPT, POMDPState((sv₀,shp_test)))
 
 # ╔═╡ 37d8c716-128b-4871-a722-f94b867b1cfc
-plot(b₀.b, bar_labels, cmap_bar)
+Plots.plot(b₀.b, bar_labels, cmap_bar)
 
 # ╔═╡ fdb3db7f-7784-477f-ace2-b65df9031b41
 md"""
@@ -1474,6 +1499,12 @@ end
 # ╔═╡ 98a0e66f-5df2-4d43-a4ae-e685d8f32fce
 argmax([0.04, 0.04, 0.83, 0.04, 0.04])
 
+# ╔═╡ a1024190-ba85-4974-9666-d7df52660cff
+initial_obs = [Observation(-1,-1,-1,NULL_document)]
+
+# ╔═╡ 1c2788f6-1f60-4841-8b0e-4a9429d593ec
+trajectory = Tuple[]
+
 # ╔═╡ 6ba39de1-73dd-48ab-a075-da9937248187
 @seeprints begin
 
@@ -1483,19 +1514,24 @@ argmax([0.04, 0.04, 0.83, 0.04, 0.04])
 	initial_belief(visible(s₀))
 	o₀ = rand(observation(pomdp, s₀, REJECT, s₀))
 	initial_belief = update(belief_updater, initial_belief, REJECT, o₀)
+
+	# global variable hack (due to @seeprints)
+	initial_obs[1] = o₀
+	empty!(trajectory)
 	
 	for (t, (s, a, o, b, sp, r)) in enumerate(stepthrough(pomdp, pomcp_policy,
 		                                                  belief_updater,
 		                                                  initial_belief,
 														  s₀,
 		                                                  "s,a,o,b,sp,r",
-		                                                  max_steps=121))
+		                                                  max_steps=20)) # 121
         @show t
 		println("Capacity=$(visible(s).c), time remaining=$(visible(s).t)")
         println(hidden(s).v," of size ", visible(s).f)
         # @show a
 		if a == ACCEPT
 			println("\t——————ACCEPT—————— ✅")
+			@info ACCEPT, t
 		else
 			println("\t(reject) ❌")
 		end
@@ -1512,7 +1548,62 @@ argmax([0.04, 0.04, 0.83, 0.04, 0.04])
         # @show hidden(sp)
         @show r
 		println("—"^20)
+		push!(trajectory, (s,a,o,b,r))
 	end
+end
+
+# ╔═╡ 9caeb007-5d5a-4eeb-a818-ff0e13e2af2f
+trajectory
+
+# ╔═╡ 2e4ba16f-6961-4f27-8782-deabe71c4d87
+trajectory[1:5]
+
+# ╔═╡ 5e000528-bdae-43a7-bd58-a7e2fb3d80be
+md"""
+# Trajectory plotting
+"""
+
+# ╔═╡ c81f187c-caa1-4a6d-8b3f-a816c063e044
+visa_statuses
+
+# ╔═╡ eab90b66-88bc-466f-a3a7-5f9d323d4c29
+visa_status_labels = ["ISIS", "Afghan", "P1/P2", "SIV", "AMCIT", ""]
+
+# ╔═╡ 2dee938e-a737-4c1c-a946-5847129b1fd0
+begin
+	color_accept = "green!70!black"
+	color_reject = "red!70!black"
+end
+
+# ╔═╡ 69e64da0-121d-4432-87e2-d9d3441725dd
+begin
+	g = DiGraph(9) # 20
+	node_styles = Dict()
+	node_tags = fill("", nv(g))
+	for i in 1:nv(g)-1
+		(s,a,_,b,r) = trajectory[i]
+		if i > 1
+			(_,_,o,_,_) = trajectory[i-1]
+		else
+			o = initial_obs[1]
+		end
+		sv = visible(s)
+		sh = hidden(s)
+		add_edge!(g, i, i+1)
+		color = a == ACCEPT ? color_accept : color_reject
+		rcolor = r <= 0 ? color_reject : color_accept
+		node_styles[i] =
+			"circle, draw=black, fill=$color, minimum size=$(sv.f)mm,
+			 label={[align=center]below:\$t_{$(params.time-i+1)}\$\\\\
+			        {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
+			 label={[align=center]above:$(visa_status_labels[Int(sh.v)+1])\\\\
+			        {\\color{gray}($(visa_status_labels[Int(o.vdoc)+1]))}}"
+		node_tags[i] = Int(o.vdoc) != Int(sh.v) ? "{\\color{white}x}" : ""
+	end
+	node_tags[nv(g)] = raw"\ldots"
+	node_styles[nv(g)] = ""
+	TikzGraphs.plot(g, node_tags, node_styles=node_styles,
+		            options="grow'=right, level distance=20mm, semithick, >=stealth'")
 end
 
 # ╔═╡ Cell order:
@@ -1662,6 +1753,7 @@ end
 # ╟─18a6f1e2-5ee2-40b2-8861-9e634a74de3a
 # ╟─b2aef310-148f-4386-a41e-ead3c32f6ca4
 # ╠═40ab3b5e-6dff-4881-9919-45aad74b0c71
+# ╠═6829eb50-5531-4989-a712-329ba8cc1b1d
 # ╠═ffc7c1cb-9e08-42ce-9b7c-dfd497125b6d
 # ╠═b755ee40-f5dc-4c65-bcd2-f6c5847a5f05
 # ╠═cae0c4b1-556a-432c-81cb-0564646d2a32
@@ -1730,4 +1822,14 @@ end
 # ╠═ed5c5dfc-883b-44be-9fe1-4d054ee94312
 # ╟─e655ae93-24ab-4305-a774-9306f585c6cd
 # ╠═98a0e66f-5df2-4d43-a4ae-e685d8f32fce
+# ╠═a1024190-ba85-4974-9666-d7df52660cff
+# ╠═1c2788f6-1f60-4841-8b0e-4a9429d593ec
 # ╠═6ba39de1-73dd-48ab-a075-da9937248187
+# ╠═9caeb007-5d5a-4eeb-a818-ff0e13e2af2f
+# ╠═2e4ba16f-6961-4f27-8782-deabe71c4d87
+# ╟─5e000528-bdae-43a7-bd58-a7e2fb3d80be
+# ╠═c81f187c-caa1-4a6d-8b3f-a816c063e044
+# ╠═eab90b66-88bc-466f-a3a7-5f9d323d4c29
+# ╠═ab91d45d-7ded-4386-88b3-a28d2ebe44ff
+# ╠═2dee938e-a737-4c1c-a946-5847129b1fd0
+# ╠═69e64da0-121d-4432-87e2-d9d3441725dd

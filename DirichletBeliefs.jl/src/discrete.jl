@@ -146,7 +146,7 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
                 spi = hiddenstateindex(momdp, sp)
                 op = obs_weight(momdp, sh, a, sp, o)
                 # bp[spi] += op * tp * b.b[shi]
-                bp[spi] += op * tp # * p_population[shi]
+                bp[spi] += op * tp * p_population[shi]
             end
         end
     end
