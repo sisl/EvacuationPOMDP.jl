@@ -114,13 +114,14 @@ end
 
 uniform_belief(up::DiscreteSubspaceUpdater) = uniform_belief(up.momdp)
 
-function initialize_belief(up::DiscreteSubspaceUpdater, dist::Categorical, counts::Vector)
+function initialize_belief(up::DiscreteSubspaceUpdater, counts::Vector, visiblestate)
     hidden_state_list = ordered_hidden_states(up.momdp)
     ns = length(hidden_state_list)
     b = zeros(ns)
-    belief = DiscreteSubspaceBelief(up.momdp, hidden_state_list, b, counts, nothing)
+    dist = Categorical(normalize(ones(ns), 1))
+    # dist = Categorical([0.01, 0.50, 0.14, 0.20, 0.15])
+    belief = DiscreteSubspaceBelief(up.momdp, hidden_state_list, b, counts, visiblestate)
     for (sidx, s) in enumerate(support(dist))
-        # sidx = hiddenstateindex(up.momdp, s)
         belief.b[sidx] = pdf(dist, s)
     end
     return belief
@@ -171,4 +172,11 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
     return DiscreteSubspaceBelief(momdp, b.hidden_state_list, bp, α′, sv)
 end
 
-update(up::DiscreteSubspaceUpdater, b::Categorical, a, o) = update(up, initialize_belief(up, b), a, o)
+
+# function update(up::DiscreteSubspaceUpdater, b::Vector, a, o)
+#     hidden_state_list = ordered_hidden_states(up.momdp)
+#     ns = length(hidden_state_list)
+#     counts = ones(ns)
+#     belief = DiscreteSubspaceBelief(up.momdp, hidden_state_list, b, counts, nothing)
+#     return update(up, belief, a, o)
+# end
