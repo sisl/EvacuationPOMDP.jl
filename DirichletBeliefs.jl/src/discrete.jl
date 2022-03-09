@@ -22,7 +22,9 @@ mutable struct DiscreteSubspaceBelief{M<:MOMDP, Sh}
     momdp::M
     hidden_state_list::Vector{Sh}       # vector of ordered states
     b::Vector{Float64}
+    counts::Vector{<:Real}
     visiblestate::Any
+    # b_population::Union{Nothing, DirichletSubspaceBelief}
 end
 
 function (b::DiscreteSubspaceBelief)(sv)
@@ -55,7 +57,8 @@ function DiscreteSubspaceBelief(momdp, b::Vector{Float64}; check::Bool=true)
                   """
         end
     end
-    return DiscreteSubspaceBelief(momdp, ordered_hidden_states(momdp), b, nothing)
+    counts = ones(length(b))
+    return DiscreteSubspaceBelief(momdp, ordered_hidden_states(momdp), b, counts, nothing)
 end
 
 
@@ -67,7 +70,9 @@ Return a DiscreteSubspaceBelief with equal probability for each state.
 function uniform_belief(momdp::MOMDP)
     hidden_state_list = ordered_hidden_states(momdp)
     ns = length(hidden_state_list)
-    return DiscreteSubspaceBelief(momdp, hidden_state_list, ones(ns) / ns, nothing)
+    counts = ones(ns)
+    b = counts / ns
+    return DiscreteSubspaceBelief(momdp, hidden_state_list, b, counts, nothing)
 end
 
 pdf(b::DiscreteSubspaceBelief, s) = b.b[hiddenstateindex(b.momdp, s)]
@@ -109,11 +114,11 @@ end
 
 uniform_belief(up::DiscreteSubspaceUpdater) = uniform_belief(up.momdp)
 
-function initialize_belief(up::DiscreteSubspaceUpdater, dist::Categorical)
+function initialize_belief(up::DiscreteSubspaceUpdater, dist::Categorical, counts::Vector)
     hidden_state_list = ordered_hidden_states(up.momdp)
     ns = length(hidden_state_list)
     b = zeros(ns)
-    belief = DiscreteSubspaceBelief(up.momdp, hidden_state_list, b, nothing)
+    belief = DiscreteSubspaceBelief(up.momdp, hidden_state_list, b, counts, nothing)
     for (sidx, s) in enumerate(support(dist))
         # sidx = hiddenstateindex(up.momdp, s)
         belief.b[sidx] = pdf(dist, s)
@@ -125,28 +130,19 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
     momdp = up.momdp
     hidden_state_space = b.hidden_state_list
     bp = zeros(length(hidden_state_space))
-    sᵥ = visible(momdp, o)
+    sv = visible(momdp, o)
 
-    # TODO: Bake in the population belief update here.
-    p_population = [1.1479e-5, 0.573952, 0.346954, 0.0705961, 0.00848645]
-
-    # for (shi, sh) in enumerate(hidden_state_space)
-    #     bp[shi] = p_population[shi] * obs_weight(momdp, sh, a, sh, o) # NOTE: s=sh, s′=sh
-    # end
-
-    # bp[end] = 1
-    # bp = p_population .* map(sh->obs_weight(momdp, sh, a, sh, o), hidden_state_space)
-    # bp = map(sh->obs_weight(momdp, sh, a, sh, o), hidden_state_space)
+    α = b.counts
+    p_population = normalize(α, 1)
 
     for (shi, sh) in enumerate(hidden_state_space)
         if pdf(b, sh) > 0.0
             T = transitionhidden(momdp, sh, a, o)
 
-            for (sp, tp) in weighted_iterator(T)
-                spi = hiddenstateindex(momdp, sp)
-                op = obs_weight(momdp, sh, a, sp, o)
-                # bp[spi] += op * tp * b.b[shi]
-                bp[spi] += op * tp * p_population[shi]
+            for (shp, thp) in weighted_iterator(T)
+                shpi = hiddenstateindex(momdp, shp)
+                op = obs_weight(momdp, sh, a, shp, o)
+                bp[shpi] += op * thp * p_population[shi]
             end
         end
     end
@@ -168,8 +164,11 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
     # Normalize
     bp ./= bp_sum
 
+    # update counts based on the belief
+    α′ = copy(α) + bp
+    up.momdp.visa_count = α′ # Update MOMDP type (to be used in `transition`)
 
-    return DiscreteSubspaceBelief(momdp, b.hidden_state_list, bp, sᵥ)
+    return DiscreteSubspaceBelief(momdp, b.hidden_state_list, bp, α′, sv)
 end
 
 update(up::DiscreteSubspaceUpdater, b::Categorical, a, o) = update(up, initialize_belief(up, b), a, o)
