@@ -35,53 +35,88 @@ POMDPs.stateindex(mdp::EvacuationMDP, s::MDPState) = mdp.stateindices[s]
 POMDPs.actionindex(mdp::EvacuationMDP, a::Action) = Int(a) + 1
 
 
-function POMDPs.transition(mdp::EvacuationMDP, s::MDPState, a::Action)
-    params = mdp.params
-    next_states = MDPState[]
-    probabilities = Float64[] 
+function likelihood(mdp::EvacuationMDP, params::EvacuationParameters, v::Int)
+    return params.visa_prob[v]
+end
+
+
+function POMDPs.transition(m::M, s::S, a::Action; input_status::Union{Nothing,VisaStatus}=nothing, input_family_size::Union{Nothing, Int}=nothing, made_it_through::Union{Nothing,Bool}=nothing) where {M <: Union{EvacuationMDP, EvacuationPOMDPType}, S <: Union{MDPState, POMDPState}}
+    params = m.params
+    null_state = typeof(m) == EvacuationMDP ? params.null_state : m.null_state
+    next_states = S[]
+    probabilities = Float64[]
     
     if !validtime(s) || !validcapacity(s)
-        push!(next_states, params.null_state)
-        push!(probabilities, 1) # double check 
+        push!(next_states, null_state)
+        push!(probabilities, 1)
     else
         if a == ACCEPT
             # check if valid capacity
-            visa_status = s.v
-            next_state_accept = MDPState(s.c - s.f, s.t - 1, 1, visa_status)
-            next_state_reject = MDPState(s.c, s.t - 1, 1, visa_status)
+            visa_status = getstatus(s)
+            next_state_accept = newstate(S, getcapacity(s) - getfamilysize(s), gettime(s) - 1, 1, visa_status)
+            next_state_reject = newstate(S, getcapacity(s), gettime(s) - 1, 1, visa_status)
+
             if !validcapacity(next_state_accept)
                 # no room for full family, so we make prob. 0 to accept and 1 reject
-                probabilities = [1,0]
+                probabilities = [1, 0]
                 next_states = [next_state_accept, next_state_reject]
             else
                 prob = params.accept_prob
-                for f in 1:length(params.family_sizes)
-                    for v in 1:length(params.visa_status)
-                        # if get on plane
-                        family_size = params.family_sizes[f]
-                        visa_status = params.visa_status[v]
-                        sp_accept = MDPState(s.c-s.f, s.t-1, family_size, visa_status)
-                        push!(next_states, sp_accept)
-                        visa_prob = params.visa_prob[v]
-                        family_prob = params.family_prob[f]
-                        push!(probabilities, prob[1] * visa_prob * family_prob)
 
+                function append_next_state_accept!(family_size::Int, visa_status::VisaStatus, f::Int, v::Int)
+                    visa_prob = likelihood(m, params, v)
+                    family_prob = params.family_prob[f]
+                    if isnothing(made_it_through) || made_it_through == true
+                        sp_accept = newstate(S, getcapacity(s)-getfamilysize(s), gettime(s)-1, family_size, visa_status)
+                        push!(next_states, sp_accept)
+                        push!(probabilities, prob[1] * visa_prob * family_prob)
+                    end
+
+                    if isnothing(made_it_through) || made_it_through == false
                         # if not
-                        sp_reject = MDPState(s.c, s.t-1, family_size, visa_status)
+                        sp_reject = newstate(S, getcapacity(s), gettime(s)-1, family_size, visa_status)
                         push!(next_states, sp_reject)
                         push!(probabilities, prob[2] * visa_prob * family_prob)
                     end
                 end
-            end
-        else # if reject     
-            for f in 1:length(params.family_sizes)
-                for v in 1:length(params.visa_status)
-                    sp = MDPState(s.c, s.t-1, params.family_sizes[f], params.visa_status[v])
-                    push!(next_states, sp)
-                    push!(probabilities, params.reject_prob[1] *
-                        params.visa_prob[v] * params.family_prob[f])
+
+                if !isnothing(input_status) && !isnothing(input_family_size)
+                    # bypassing transition function (used for deterministic population trajectories)
+                    f = input_family_size # array starts at 1, goes to max (i.e., already an index)
+                    v = Int(input_status) + 1 # zero-based enum to one-based index
+                    append_next_state_accept!(input_family_size, input_status, f, v)
+                else
+                    for f in 1:length(params.family_sizes)
+                        for v in 1:length(params.visa_status)
+                            # if get on plane
+                            family_size = params.family_sizes[f]
+                            visa_status = params.visa_status[v]
+                            append_next_state_accept!(family_size, visa_status, f, v)
+                        end
+                    end
                 end
-            end  
+            end
+        else # if reject
+            function append_next_state_reject!(family_size::Int, visa_status::VisaStatus, f::Int, v::Int)
+                sp = newstate(S, getcapacity(s), gettime(s)-1, family_size, visa_status)
+                push!(next_states, sp)
+                visa_prob = likelihood(m, params, v)
+                push!(probabilities, params.reject_prob[1] * visa_prob * params.family_prob[f])
+            end
+
+            if !isnothing(input_status) && !isnothing(input_family_size)
+                f = input_family_size
+                v = Int(input_status) + 1
+                append_next_state_reject!(input_family_size, input_status, f, v)
+            else
+                for f in 1:length(params.family_sizes)
+                    for v in 1:length(params.visa_status)
+                        family_size = params.family_sizes[f]
+                        visa_status = params.visa_status[v]
+                        append_next_state_reject!(family_size, visa_status, f, v)
+                    end
+                end  
+            end
         end
     end
     normalize!(probabilities, 1)

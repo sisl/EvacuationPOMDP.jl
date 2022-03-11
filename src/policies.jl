@@ -66,3 +66,12 @@ function POMDPs.action(policy::BeforeThresholdAMCITsPolicy, s::MDPState)
         return action(policy.mdp_policy, s)
     end
 end
+
+
+##################################################
+
+struct RandomBaselinePolicy <: Policy end
+
+function POMDPs.action(::RandomBaselinePolicy, s::MDPState)
+    return rand() < 0.5 ? ACCEPT : REJECT
+end

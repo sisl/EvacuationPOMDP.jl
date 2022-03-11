@@ -15,7 +15,7 @@ function plot_claims(p; text="", xticks=false, legend=false, kwargs...)
     categories = visa_statuses
     transposed = reshape(categories, (1, length(categories)))
     p = reshape(p, (1, length(p)))
-    plegend = legend ? :left : false
+    plegend = false # legend ? :left : false
     bar(
         transposed,
         p,
@@ -26,12 +26,14 @@ function plot_claims(p; text="", xticks=false, legend=false, kwargs...)
         bottommargin=-3Plots.mm,
         leftmargin=3Plots.mm,
         xticks=xticks ? true : (1:length(p), fill("", length(p))),
-        ylims=(0, 1.15),
+        yticks=([0, 0.5, 1], [0, 0.5,  1]),
+        ylims=(0, 1.20),
         size=(600,150),
+        legendfontsize=2,
         c=[get(cmap_bar, i/length(categories)) for i in 1:length(categories)]';
         kwargs...
     )
-    annotate!([(0, 1.05, (text, 10, :black, :left))])
+    annotate!([(0, 1.075, (text, 10, :black, :left))])
 end
 
 
@@ -42,7 +44,7 @@ function plot_all_claims(pomdp::EvacuationPOMDPType)
     p3 = plot_claims(claims.p_p1p2; text=L"P(v_\mathrm{obs} \mid v=\texttt{P1/P2})")
     p4 = plot_claims(claims.p_afghan; text=L"P(v_\mathrm{obs} \mid v=\texttt{Vul. Afghan})")
     p5 = plot_claims(claims.p_isis; xticks=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{ISIS})")
-    Plots.plot(p1, p2, p3, p4, p5, layout=@layout([a;b;c;d;e]), size=(450,900), plot_title="claim models")
+    Plots.plot(p1, p2, p3, p4, p5, layout=@layout([a;b;c;d;e]), size=(450,500), plot_title="claim models")
 end
 
 

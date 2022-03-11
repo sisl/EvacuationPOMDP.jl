@@ -11,6 +11,7 @@ using DirichletBeliefs
 using DiscreteValueIteration
 using Distributions 
 using Graphs
+using JSON
 using LaTeXStrings
 using LinearAlgebra
 using Measures
@@ -77,6 +78,7 @@ include("policies.jl")
 
 export
     get_metrics,
+    manual_simulate,
     simulation,
     mean_std,
     simulations,

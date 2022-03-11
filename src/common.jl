@@ -194,3 +194,20 @@ end
 ## Discount factor
 ##################################################
 POMDPs.discount(mdp::Union{EvacuationMDP, EvacuationPOMDPType}) = 0.95
+
+
+##################################################
+## State-level shared functions (used primarily in transition)
+##################################################
+newstate(::Type{MDPState}, c, f, t, v) = MDPState(c, f, t, v)
+newstate(::Type{POMDPState}, c, f, t, v) = POMDPState((VisibleState(c, f, t), HiddenState(v)))
+
+getcapacity(s::MDPState) = s.c
+getcapacity(s::POMDPState) = visible(s).c
+gettime(s::MDPState) = s.t
+gettime(s::POMDPState) = visible(s).t
+getfamilysize(s::POMDPState) = visible(s).f
+getfamilysize(s::MDPState) = s.f
+getfamilysize(s::POMDPState) = visible(s).f
+getstatus(s::MDPState) = s.v
+getstatus(s::POMDPState) = hidden(s).v

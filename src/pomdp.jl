@@ -63,70 +63,6 @@ validtime(s::POMDPState) = validtime(visible(s))
 validcapacity(s::POMDPState) = validcapacity(visible(s))
 
 
-# TODO: Reuse MDP version.
-function POMDPs.transition(pomdp::EvacuationPOMDPType, s::POMDPState, a::Action)
-    params = pomdp.params
-    sv = visible(s)
-    sh = hidden(s)
-    next_states = POMDPState[]
-    probabilities = Float64[]
-
-    if !validtime(s) || !validcapacity(s)
-        push!(next_states, pomdp.null_state)
-        push!(probabilities, 1)
-    else
-        if a == ACCEPT
-            # check if valid capacity
-            visa_status = sh.v
-            next_state_accept = POMDPState((VisibleState(sv.c - sv.f, sv.t - 1, 1), HiddenState(visa_status)))
-            next_state_reject = POMDPState((VisibleState(sv.c, sv.t - 1, 1), HiddenState(visa_status)))
-
-            if !validcapacity(next_state_accept)
-                # no room for full family, so we make prob. 0 to accept and 1 reject
-                probabilities = [1, 0]
-                next_states = [next_state_accept, next_state_reject]
-            else
-                prob = params.accept_prob
-                for f in 1:length(params.family_sizes)
-                    for v in 1:length(params.visa_status)
-                        # if get on plane
-                        family_size = params.family_sizes[f]
-                        visa_status = params.visa_status[v]
-                        svp_accept = VisibleState(sv.c-sv.f, sv.t-1, family_size)
-                        shp_accept = HiddenState(visa_status)
-                        sp_accept = POMDPState((svp_accept, shp_accept))
-                        push!(next_states, sp_accept)
-                        visa_prob = likelihood(pomdp, v)
-                        family_prob = params.family_prob[f]
-                        push!(probabilities, prob[1] * visa_prob * family_prob)
-
-                        # if not
-                        svp_reject = VisibleState(sv.c, sv.t-1, family_size)
-                        shp_reject = HiddenState(visa_status)
-                        sp_reject = POMDPState((svp_reject, shp_reject))
-                        push!(next_states, sp_reject)
-                        push!(probabilities, prob[2] * visa_prob * family_prob)
-                    end
-                end
-            end
-        else # if reject
-            for f in 1:length(params.family_sizes)
-                for v in 1:length(params.visa_status)
-                    svp = VisibleState(sv.c, sv.t-1, params.family_sizes[f])
-                    shp = HiddenState(params.visa_status[v])
-                    sp = POMDPState((svp, shp))
-                    push!(next_states, sp)
-                    push!(probabilities, params.reject_prob[1] *
-                        likelihood(pomdp, v) * params.family_prob[f])
-                end
-            end
-        end
-    end
-    normalize!(probabilities, 1)
-    return SparseCat(next_states, probabilities)
-end
-
-
 function MOMDPs.transitionhidden(pomdp::EvacuationPOMDPType, sh::HiddenState, a::Action, o=missing)
     hiddenstates = ordered_hidden_states(pomdp)
     p = normalize(pomdp.visa_count, 1)
@@ -143,7 +79,7 @@ function POMDPs.isterminal(pomdp::EvacuationPOMDPType, s::POMDPState)
 end
 
 
-function likelihood(pomdp::EvacuationPOMDPType, v::Int)
+function likelihood(pomdp::EvacuationPOMDPType, params::EvacuationParameters, v::Int)
     p = normalize(pomdp.visa_count, 1)
     return p[v]
 end
