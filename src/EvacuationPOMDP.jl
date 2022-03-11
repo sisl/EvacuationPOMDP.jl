@@ -93,6 +93,7 @@ include("trajectory.jl")
 
 export
     plot_claims,
+    plot_claims_tiny,
     plot_all_claims,
     vis_all
 include("visualization.jl")

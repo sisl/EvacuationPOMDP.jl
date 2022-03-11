@@ -1,22 +1,21 @@
-function simulate_trajectory(pomdp::POMDP, pomdp_policy)
+function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing)
     up = updater(pomdp)
-    s₀ = rand(initialstate(pomdp))
-    prior_belief = initialize_belief(up, pomdp.params.visa_count, visible(s₀))
-    o₀ = rand(observation(pomdp, s₀, REJECT, s₀))
-    initial_belief = update(up, prior_belief, REJECT, o₀)
-
-    # global variable hack (due to @seeprints)
-    # initial_obs[1] = o₀
-    # empty!(trajectory)
-    # trajectory = [(nothing, nothing, o₀, nothing, nothing)]
     trajectory = []
+
+    if isnothing(seed)
+        s₀ = rand(initialstate(pomdp))
+        prior_belief = initialize_belief(up, pomdp.params.visa_count, visible(s₀))
+        o₀ = rand(observation(pomdp, s₀, REJECT, s₀))
+        initial_belief = update(up, prior_belief, REJECT, o₀)
+        iterator = enumerate(stepthrough(pomdp, pomdp_policy, up, initial_belief, s₀, "s,a,r,sp,b,o", max_steps=130))
+    else
+        populations = read_population_json()
+        population = populations[seed]
+        iterator = enumerate(manual_simulate(pomdp, pomdp_policy, up, population; include_all=true))
+        o₀ = last(collect(iterator))[end].o0
+    end
     
-    for (t, (s, a, o, b, sp, r)) in enumerate(stepthrough(pomdp, pomdp_policy,
-                                                          up,
-                                                          initial_belief,
-                                                          s₀,
-                                                          "s,a,o,b,sp,r",
-                                                          max_steps=130)) # 121
+    for (t, (s, a, r, sp, b, o)) in iterator
         @show t
         println("Capacity=$(visible(s).c), time remaining=$(visible(s).t)")
         println(hidden(s).v," of size ", visible(s).f)
@@ -47,12 +46,18 @@ function simulate_trajectory(pomdp::POMDP, pomdp_policy)
 end
 
 
-function simulate_trajectory(mdp::MDP, mdp_policy)
+function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing)
     trajectory = []
     
-    for (t, (s, a, sp, r)) in enumerate(stepthrough(mdp, mdp_policy,
-                                                    "s,a,sp,r",
-                                                    max_steps=130))
+    if isnothing(seed)
+        iterator = enumerate(stepthrough(mdp, mdp_policy, "s,a,r,sp", max_steps=130))
+    else
+        populations = read_population_json()
+        population = populations[seed]
+        iterator = enumerate(manual_simulate(mdp, mdp_policy, population))
+    end
+
+    for (t, (s, a, r, sp)) in iterator
         @show t
         println("Capacity=$(s.c), time remaining=$(s.t)")
         println(s.v," of size ", s.f)
@@ -76,26 +81,49 @@ _color_accept = "green!70!black"
 _color_reject = "red!70!black"
 _visa_status_labels = ["ISIS", "VulAfghan", "P1/P2", "SIV", "AMCIT", ""]
 
-function plot_trajectory(mdp::MDP, trajectory, filename; N=length(trajectory))
-    g = DiGraph(N)
+function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(trajectory))
+    half = N÷2 + 1
+    N += 1
+    g = DiGraph(N+1)
     node_styles = Dict()
     node_tags = fill("", nv(g))
     for i in 1:nv(g)
-        (s,a,r) = trajectory[i]
+        nodei = i
+        if i != nv(g)
+            add_edge!(g, nodei, nodei+1)
+        end
 
-        add_edge!(g, i, i+1)
+        if i == half
+            node_tags[nodei] = raw"\ldots"
+            node_styles[nodei] = "rectangle, draw=gray, minimum size=5mm"
+            continue
+        elseif i >= half
+            i = (length(trajectory) - half) + (i - half)
+        end
+        if m isa MDP
+            (s,a,r) = trajectory[i]
+            obs = ""
+            node_tags[nodei] = ""
+        elseif m isa POMDP
+            (s,a,o,b,r) = trajectory[i]
+            obs = "\\\\{\\color{gray}($(_visa_status_labels[Int(o.vdoc)+1]))}"
+            node_tags[nodei] = Int(o.vdoc) != Int(getstatus(s)) ? "{\\color{white}x}" : ""
+        end
+        t = gettime(s)
+        c = getcapacity(s)
+        f = getfamilysize(s)
+        v = getstatus(s)
+
         color = a == ACCEPT ? _color_accept : _color_reject
         rcolor = r <= 0 ? _color_reject : _color_accept
 
-        node_styles[i] =
-        "circle, draw=black, fill=$color, minimum size=$(s.f)mm,
-         label={[align=center]below:\$t_{$(mdp.params.time-i+1)}\$\\\\
+        node_styles[nodei] =
+        "circle, draw=black, fill=$color, minimum size=$(f)mm,
+         label={[align=center]below:\$t_{$t}\$\\\\
+                \$(c_{$c})\$\\\\
                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-         label={[align=center]above:$(_visa_status_labels[Int(s.v)+1])}"
-        node_tags[i] = ""
+         label={[align=center]above:$(_visa_status_labels[Int(v)+1]) $obs}"
     end
-    node_tags[nv(g)] = raw"\ldots"
-    node_styles[nv(g)] = ""
     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
                          options="grow'=right, level distance=22mm, semithick, >=stealth'")
     TikzGraphs.save(TikzGraphs.PDF(filename), tp)
@@ -103,31 +131,35 @@ function plot_trajectory(mdp::MDP, trajectory, filename; N=length(trajectory))
 end
 
 
-function plot_trajectory(pomdp::POMDP, trajectory, filename; N=length(trajectory))
-    g = DiGraph(N)
-    node_styles = Dict()
-    node_tags = fill("", nv(g))
-    for i in 1:nv(g)
-        (s,a,o,b,r) = trajectory[i]
-        sv = visible(s)
-        sh = hidden(s)
+# function plot_trajectory(pomdp::POMDP, trajectory, filename; N=length(trajectory))
+#     g = DiGraph(N)
+#     node_styles = Dict()
+#     node_tags = fill("", nv(g))
+#     for i in 1:nv(g)
+#         (s,a,o,b,r) = trajectory[i]
+#         t = gettime(s)
+#         c = getcapacity(s)
+#         f = getfamilysize(s)
+#         v = getstatus(s)
+#         sv = visible(s)
+#         sh = hidden(s)
 
-        add_edge!(g, i, i+1)
-        color = a == ACCEPT ? _color_accept : _color_reject
-        rcolor = r <= 0 ? _color_reject : _color_accept
+#         add_edge!(g, i, i+1)
+#         color = a == ACCEPT ? _color_accept : _color_reject
+#         rcolor = r <= 0 ? _color_reject : _color_accept
 
-        node_styles[i] =
-        "circle, draw=black, fill=$color, minimum size=$(sv.f)mm,
-         label={[align=center]below:\$t_{$(pomdp.params.time-i+1)}\$\\\\
-                {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-         label={[align=center]above:$(_visa_status_labels[Int(sh.v)+1])\\\\
-                {\\color{gray}($(_visa_status_labels[Int(o.vdoc)+1]))}}"
-        node_tags[i] = Int(o.vdoc) != Int(sh.v) ? "{\\color{white}x}" : ""
-    end
-    node_tags[nv(g)] = raw"\ldots"
-    node_styles[nv(g)] = ""
-    tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
-                         options="grow'=right, level distance=22mm, semithick, >=stealth'")
-    TikzGraphs.save(TikzGraphs.PDF(filename), tp)
-    return tp
-end
+#         node_styles[i] =
+#         "circle, draw=black, fill=$color, minimum size=$(f)mm,
+#          label={[align=center]below:\$t_{$(pomdp.params.time-i+1)}\$\\\\
+#                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
+#          label={[align=center]above:$(_visa_status_labels[Int(v)+1])\\\\
+#                 {\\color{gray}($(_visa_status_labels[Int(o.vdoc)+1]))}}"
+#         node_tags[i] = Int(o.vdoc) != Int(sh.v) ? "{\\color{white}x}" : ""
+#     end
+#     node_tags[nv(g)] = raw"\ldots"
+#     node_styles[nv(g)] = ""
+#     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
+#                          options="grow'=right, level distance=22mm, semithick, >=stealth'")
+#     TikzGraphs.save(TikzGraphs.PDF(filename), tp)
+#     return tp
+# end

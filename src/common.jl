@@ -130,7 +130,7 @@ end
     p_amcit = normalize([0, 0, 0, 0.0, 1.0], 1)
     p_siv = normalize([0, 0, 0, 0.99, 0.01], 1)
     p_p1p2 = normalize([0, 0, 0.95, 0.04, 0.01], 1)
-    p_afghan = normalize([0, 0.9, 0.15, 0.009, 0.005], 1)
+    p_afghan = normalize([0, 0.95, 0.1, 0.009, 0.005], 1)
     p_isis = normalize([0.01, 0.94, 0.04, 0.009, 0.001], 1)
 end
 

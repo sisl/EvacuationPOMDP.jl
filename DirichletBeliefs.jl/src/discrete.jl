@@ -137,14 +137,12 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
     p_population = normalize(α, 1)
 
     for (shi, sh) in enumerate(hidden_state_space)
-        if pdf(b, sh) > 0.0
-            T = transitionhidden(momdp, sh, a, o)
+        T = transitionhidden(momdp, sh, a, o)
 
-            for (shp, thp) in weighted_iterator(T)
-                shpi = hiddenstateindex(momdp, shp)
-                op = obs_weight(momdp, sh, a, shp, o)
-                bp[shpi] += op * thp * p_population[shi]
-            end
+        for (shp, thp) in weighted_iterator(T)
+            shpi = hiddenstateindex(momdp, shp)
+            op = obs_weight(momdp, sh, a, shp, o)
+            bp[shpi] += op * thp * p_population[shi]
         end
     end
 

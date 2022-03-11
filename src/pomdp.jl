@@ -55,7 +55,16 @@ end
 
 function POMDPs.initialstate(pomdp::EvacuationPOMDPType)
     params = pomdp.params
-    return Deterministic(POMDPState((VisibleState(params.capacity, params.time, 3), HiddenState(AMCIT))))
+    c_initial = params.capacity
+    t_initial = params.time
+    S = []
+    for f in params.family_sizes
+        for v in params.visa_status
+            s = POMDPState((VisibleState(c_initial, t_initial, f), HiddenState(v)))
+            push!(S, s)
+        end
+    end
+    return SparseCat(S, normalize(ones(length(S)), 1))
 end
 
 

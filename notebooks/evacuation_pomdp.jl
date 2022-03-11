@@ -113,6 +113,18 @@ println()
 # ╔═╡ 2d58015e-1e3d-4000-ae68-5d5222fa8101
 mdpdata = experiments(1000, mdp, mdp_policy)
 
+# ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
+# pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
+
+# ╔═╡ b2f56210-7de8-4cf2-9f54-1982dde001d8
+# pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
+
+# ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
+BSON.@save "pomdpdata.bson" pomdpdata
+
+# ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
+BSON.@save "pomdplitedata.bson" pomdplitedata
+
 # ╔═╡ 7b608351-17ef-4dd9-aa17-1c69bacd47d9
 BSON.@save "mdpdata.bson" mdpdata
 
@@ -254,7 +266,7 @@ function solve_pomdp(::Type{POMCPSolver}, pomdp::EvacuationPOMDPType)
 
 	pomcp_solver = POMCPSolver(
 		max_depth=10,
-		tree_queries=100,
+		tree_queries=1000,
 		estimate_value=rollout_estimator)
 	
 	pomcp_policy = solve(pomcp_solver, pomdp)
@@ -264,20 +276,8 @@ end
 # ╔═╡ 6fe49d6b-343a-4250-8744-a6ba734e51d0
 pomcp_policy_lite = solve_pomdp(POMCPSolver, pomdplite);
 
-# ╔═╡ b2f56210-7de8-4cf2-9f54-1982dde001d8
-pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
-
-# ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
-BSON.@save "pomdplitedata.bson" pomdplitedata
-
 # ╔═╡ e1be8687-43db-46e9-99ad-eff59c3c2985
 pomcp_policy = solve_pomdp(POMCPSolver, pomdp)
-
-# ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
-pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
-
-# ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
-BSON.@save "pomdpdata.bson" pomdpdata
 
 # ╔═╡ 7a301ad6-e31f-4d20-b527-a26573473c0e
 begin
@@ -352,19 +352,44 @@ plot_claims(pomdp.params.visa_prob; text="Visa probability distribution")
 # ╔═╡ 56d742f1-4fb7-4afe-8674-f343d6672364
 pomdp.params.visa_prob
 
+# ╔═╡ 9f2b615d-4187-424f-adb5-f092c78faec5
+plot_claims_tiny(pomdp.params.visa_prob)
+
 # ╔═╡ f429f2b4-959b-4ed2-bd49-6ba961ba2382
 md"""
 # Simulations
 """
 
-# ╔═╡ ff841f9f-0603-4d05-a820-736a4cc62e3d
-pomdp_trajectory = simulate_trajectory(pomdp, pomcp_policy)
-
-# ╔═╡ 7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
-pomdplite_trajectory = simulate_trajectory(pomdplite, pomcp_policy_lite)
+# ╔═╡ 38b970ed-0fc2-44d4-bf0d-4ad5fa70d1ff
+traj_seed = 3
 
 # ╔═╡ 466f9de5-2df5-48a3-b481-7a45858410ae
-mdp_trajectory = simulate_trajectory(mdp, mdp_policy)
+begin
+	Random.seed!(traj_seed)
+	mdp_trajectory = simulate_trajectory(mdp, mdp_policy; seed=traj_seed)
+end
+
+# ╔═╡ 7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
+begin
+	Random.seed!(traj_seed)
+	pomdplite_trajectory = simulate_trajectory(pomdplite, pomcp_policy_lite; 
+											   seed=traj_seed)
+end
+
+# ╔═╡ ff841f9f-0603-4d05-a820-736a4cc62e3d
+begin
+	Random.seed!(traj_seed)
+	pomdp_trajectory = simulate_trajectory(pomdp, pomcp_policy; seed=traj_seed)
+end
+
+# ╔═╡ 3b3110a8-8322-404f-8ad9-f4361640666e
+[plot_claims_tiny(τ[end-1].b) for τ in pomdp_trajectory]
+
+# ╔═╡ 9c10c8d3-71a7-422b-b24e-8e2cb2997cca
+map(t->t[end-1].b, pomdp_trajectory[end-2:end])
+
+# ╔═╡ cd3e1287-979d-46f3-84a2-51f97739f409
+pomdp_trajectory[end-2:end]
 
 # ╔═╡ 5e000528-bdae-43a7-bd58-a7e2fb3d80be
 md"""
@@ -374,14 +399,23 @@ md"""
 # ╔═╡ 2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
 N = 20
 
-# ╔═╡ 69e64da0-121d-4432-87e2-d9d3441725dd
-plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N)
+# ╔═╡ 52e291aa-15c4-44de-8ba8-a7ca585b2a0a
+(length(mdp_trajectory) - 11) + (12 - 11)
+
+# ╔═╡ abc10285-ae4d-4434-9c2a-8f5eb6c2676a
+length(mdp_trajectory)
+
+# ╔═╡ 9a44ca83-3b85-4f79-adea-4ffdfb0bbffa
+mdp_trajectory[end]
+
+# ╔═╡ 0a08a0ca-0b87-454b-9b30-6afcfc375009
+plot_trajectory(mdp, mdp_trajectory, "traj_mdp"; N=N)
 
 # ╔═╡ 281a7c2d-b1ce-4b33-b227-f3b2a6237725
 plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite"; N=N)
 
-# ╔═╡ cacc6e08-b2c0-4ec3-a768-fa3eb8308789
-plot_trajectory(mdp, mdp_trajectory, "traj_mdp"; N=N)
+# ╔═╡ 69e64da0-121d-4432-87e2-d9d3441725dd
+plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N)
 
 # ╔═╡ 9a142f50-9c0b-4d5a-807d-07d4992b5155
 md"""
@@ -463,14 +497,22 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╟─f1914e6d-8dd2-4412-af20-93530ef0d030
 # ╠═0d1c09ae-e27d-4d9c-84f4-13c4eca12b43
 # ╠═56d742f1-4fb7-4afe-8674-f343d6672364
+# ╠═9f2b615d-4187-424f-adb5-f092c78faec5
+# ╠═3b3110a8-8322-404f-8ad9-f4361640666e
+# ╠═9c10c8d3-71a7-422b-b24e-8e2cb2997cca
+# ╠═cd3e1287-979d-46f3-84a2-51f97739f409
 # ╟─f429f2b4-959b-4ed2-bd49-6ba961ba2382
-# ╠═ff841f9f-0603-4d05-a820-736a4cc62e3d
-# ╠═7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
+# ╠═38b970ed-0fc2-44d4-bf0d-4ad5fa70d1ff
 # ╠═466f9de5-2df5-48a3-b481-7a45858410ae
+# ╠═7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
+# ╠═ff841f9f-0603-4d05-a820-736a4cc62e3d
 # ╟─5e000528-bdae-43a7-bd58-a7e2fb3d80be
 # ╠═00e07de2-e92b-499d-b446-595a968b1ecc
 # ╠═2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
-# ╠═cacc6e08-b2c0-4ec3-a768-fa3eb8308789
+# ╠═52e291aa-15c4-44de-8ba8-a7ca585b2a0a
+# ╠═abc10285-ae4d-4434-9c2a-8f5eb6c2676a
+# ╠═9a44ca83-3b85-4f79-adea-4ffdfb0bbffa
+# ╠═0a08a0ca-0b87-454b-9b30-6afcfc375009
 # ╠═281a7c2d-b1ce-4b33-b227-f3b2a6237725
 # ╠═69e64da0-121d-4432-87e2-d9d3441725dd
 # ╟─9a142f50-9c0b-4d5a-807d-07d4992b5155

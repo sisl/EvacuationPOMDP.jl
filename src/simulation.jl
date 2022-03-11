@@ -72,18 +72,29 @@ function manual_simulate(mdp::EvacuationMDP, policy, population)
 end
 
 
-function manual_simulate(pomdp::EvacuationPOMDPType, policy, up::Updater, s0::POMDPState, o0::Observation, b, population)
+function manual_simulate(pomdp::EvacuationPOMDPType, policy, up::Updater, population; include_all=false)
     first_fam = popfirst!(population)
-    s = newstate(POMDPState, visible(s0).c, visible(s0).t, first_fam.family_size, first_fam.status)
+    _s = rand(initialstate(pomdp))
+    s = newstate(POMDPState, visible(_s).c, visible(_s).t, first_fam.family_size, first_fam.status)
+    Random.seed!(0) # TODO.
+    o0 = rand(observation(pomdp, s, REJECT, s))
+    prior_belief = initialize_belief(up, pomdp.params.visa_count, s)
+    b = update(up, prior_belief, REJECT, o0)
     τ = []
+
     while !isterminal(pomdp, s)
         a = action(policy, b)
         r = reward(pomdp, s, a)
         status, family_size, made_it_through = popfirst!(population)
         sp = rand(transition(pomdp, s, a; input_status=status, input_family_size=family_size, made_it_through=made_it_through))
+        Random.seed!(0) # TODO.
         o = rand(observation(pomdp, s, a, sp))
         bp = update(up, b, a, o)
-        push!(τ, (s=s, a=a, r=r, sp=sp))
+        if include_all
+            push!(τ, (s=s, a=a, r=r, sp=sp, b=b, o=o, o0=o0))
+        else
+            push!(τ, (s=s, a=a, r=r, sp=sp))
+        end
         s = sp
         b = bp
     end
@@ -105,16 +116,16 @@ end
 
 function simulation(pomdp::POMDP, policy, population=nothing)
     up = updater(pomdp)
-    initial_state = rand(initialstate(pomdp))
-    initial_obs = rand(observation(pomdp, initial_state, REJECT, initial_state))
-    prior_belief = initialize_belief(up, pomdp.params.visa_count, initial_state)
-    initial_belief = update(up, prior_belief, REJECT, initial_obs)
 
     if isnothing(population)
+        initial_state = rand(initialstate(pomdp))
+        initial_obs = rand(observation(pomdp, initial_state, REJECT, initial_state))
+        prior_belief = initialize_belief(up, pomdp.params.visa_count, initial_state)
+        initial_belief = update(up, prior_belief, REJECT, initial_obs)
         hr = HistoryRecorder()
         history = simulate(hr, pomdp, policy, up, initial_belief, initial_state)
     else
-        history = manual_simulate(pomdp, policy, up, initial_state, initial_obs, initial_belief, population)
+        history = manual_simulate(pomdp, policy, up, population)
     end
     return history
 end

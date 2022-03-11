@@ -11,7 +11,7 @@ cmap_bar = ColorScheme([afghan_red, colorant"lightgray", afghan_green])
 visa_statuses = ["ISIS-K", "Vul. Afghan", "P1/P2 Afghan", "SIV", "AMCIT"] # NOTE: ordering
 
 
-function plot_claims(p; text="", xticks=false, legend=false, kwargs...)
+function plot_claims(p; small=false, text="", xticks=false, legend=false, kwargs...)
     categories = visa_statuses
     transposed = reshape(categories, (1, length(categories)))
     p = reshape(p, (1, length(p)))
@@ -22,13 +22,13 @@ function plot_claims(p; text="", xticks=false, legend=false, kwargs...)
         labels=transposed,
         bar_width=1,
         legend=plegend,
-        topmargin=-2Plots.mm,
-        bottommargin=-3Plots.mm,
+        topmargin=small ? -2Plots.mm : 0Plots.mm,
+        bottommargin=small ? -3Plots.mm : 0Plots.mm,
         leftmargin=3Plots.mm,
-        xticks=xticks ? true : (1:length(p), fill("", length(p))),
+        xticks=xticks || !small ? true : (1:length(p), fill("", length(p))),
         yticks=([0, 0.5, 1], [0, 0.5,  1]),
         ylims=(0, 1.20),
-        size=(600,150),
+        size=small ? (600,150) : (500,150),
         legendfontsize=2,
         c=[get(cmap_bar, i/length(categories)) for i in 1:length(categories)]';
         kwargs...
@@ -37,13 +37,35 @@ function plot_claims(p; text="", xticks=false, legend=false, kwargs...)
 end
 
 
+function plot_claims_tiny(p; kwargs...)
+    categories = visa_statuses
+    transposed = reshape(categories, (1, length(categories)))
+    p = reshape(p, (1, length(p)))
+    plegend = false # legend ? :left : false
+    bar(
+        transposed,
+        p,
+        labels=transposed,
+        bar_width=1.5,
+        legend=plegend,
+        xticks=false,
+        yticks=false,
+        ylims=(0, 1),
+        size=(100,100),
+        framestyle=:none,
+        c=[get(cmap_bar, i/length(categories)) for i in 1:length(categories)]';
+        kwargs...
+    )
+end
+
+
 function plot_all_claims(pomdp::EvacuationPOMDPType)
     claims = pomdp.claims
-    p1 = plot_claims(claims.p_amcit; legend=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{AMCIT})")
-    p2 = plot_claims(claims.p_siv; text=L"P(v_\mathrm{obs} \mid v=\texttt{SIV})")
-    p3 = plot_claims(claims.p_p1p2; text=L"P(v_\mathrm{obs} \mid v=\texttt{P1/P2})")
-    p4 = plot_claims(claims.p_afghan; text=L"P(v_\mathrm{obs} \mid v=\texttt{Vul. Afghan})")
-    p5 = plot_claims(claims.p_isis; xticks=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{ISIS})")
+    p1 = plot_claims(claims.p_amcit; small=true, legend=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{AMCIT})")
+    p2 = plot_claims(claims.p_siv; small=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{SIV})")
+    p3 = plot_claims(claims.p_p1p2; small=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{P1/P2})")
+    p4 = plot_claims(claims.p_afghan; small=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{Vul. Afghan})")
+    p5 = plot_claims(claims.p_isis; small=true, xticks=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{ISIS})")
     Plots.plot(p1, p2, p3, p4, p5, layout=@layout([a;b;c;d;e]), size=(450,500), plot_title="claim models")
 end
 
