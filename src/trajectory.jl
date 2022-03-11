@@ -115,6 +115,7 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
         v = getstatus(s)
 
         color = a == ACCEPT ? _color_accept : _color_reject
+        color = nodei == nv(g) ? "gray" : color
         rcolor = r <= 0 ? _color_reject : _color_accept
 
         node_styles[nodei] =
@@ -129,37 +130,3 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
     TikzGraphs.save(TikzGraphs.PDF(filename), tp)
     return tp
 end
-
-
-# function plot_trajectory(pomdp::POMDP, trajectory, filename; N=length(trajectory))
-#     g = DiGraph(N)
-#     node_styles = Dict()
-#     node_tags = fill("", nv(g))
-#     for i in 1:nv(g)
-#         (s,a,o,b,r) = trajectory[i]
-#         t = gettime(s)
-#         c = getcapacity(s)
-#         f = getfamilysize(s)
-#         v = getstatus(s)
-#         sv = visible(s)
-#         sh = hidden(s)
-
-#         add_edge!(g, i, i+1)
-#         color = a == ACCEPT ? _color_accept : _color_reject
-#         rcolor = r <= 0 ? _color_reject : _color_accept
-
-#         node_styles[i] =
-#         "circle, draw=black, fill=$color, minimum size=$(f)mm,
-#          label={[align=center]below:\$t_{$(pomdp.params.time-i+1)}\$\\\\
-#                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-#          label={[align=center]above:$(_visa_status_labels[Int(v)+1])\\\\
-#                 {\\color{gray}($(_visa_status_labels[Int(o.vdoc)+1]))}}"
-#         node_tags[i] = Int(o.vdoc) != Int(sh.v) ? "{\\color{white}x}" : ""
-#     end
-#     node_tags[nv(g)] = raw"\ldots"
-#     node_styles[nv(g)] = ""
-#     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
-#                          options="grow'=right, level distance=22mm, semithick, >=stealth'")
-#     TikzGraphs.save(TikzGraphs.PDF(filename), tp)
-#     return tp
-# end
