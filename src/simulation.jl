@@ -217,7 +217,7 @@ function simulations(policy, str_policy, mdp, n_sims) # n is number of times to 
     end
 
     # print("$str_policy$tabs_policy&\t\t\$$(mean_std_reward[1]) \\pm $(mean_std_reward[2])\$\t&\t\t\$$(mean_std_total_accepted_people[1]) \\pm $(mean_std_total_accepted_people[2]) \\;($(mean_std_percent_accepted_people[1])\\pm$(mean_std_percent_accepted_people[2])\\%)\$\t\t&\t")
-    print("$str_policy$tabs_policy&\t\t\$$(mean_std_reward[1]) \\pm $(mean_std_reward[2])\$\t&\t\t\${}^{($(mean_std_total_accepted_people[1]) \\pm $(mean_std_total_accepted_people[2]))}/_{$(mean_std_total_people[1])}\$\t\t&\t")
+    print("$str_policy$tabs_policy&\t\t\$$(mean_std_reward[1]) \\pm $(mean_std_reward[2])\$\t&\t\t\$($(mean_std_total_accepted_people[1]) \\pm $(mean_std_total_accepted_people[2]))/$(mean_std_total_people[1])\$\t\t&\t")
     for visa_status in sort(collect(keys(base_dict)), rev=true)
         st_visa_status = string(visa_status)
         expectation_acc = round(base_dict[visa_status]/n_sims, digits=2)

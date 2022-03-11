@@ -76,9 +76,8 @@ _color_accept = "green!70!black"
 _color_reject = "red!70!black"
 _visa_status_labels = ["ISIS", "VulAfghan", "P1/P2", "SIV", "AMCIT", ""]
 
-function plot_trajectory(mdp::MDP, trajectory, filename)
-    Nτ = length(trajectory)
-    g = DiGraph(Nτ)
+function plot_trajectory(mdp::MDP, trajectory, filename; N=length(trajectory))
+    g = DiGraph(N)
     node_styles = Dict()
     node_tags = fill("", nv(g))
     for i in 1:nv(g)
@@ -104,9 +103,8 @@ function plot_trajectory(mdp::MDP, trajectory, filename)
 end
 
 
-function plot_trajectory(pomdp::POMDP, trajectory, filename)
-    Nτ = length(trajectory)
-    g = DiGraph(Nτ)
+function plot_trajectory(pomdp::POMDP, trajectory, filename; N=length(trajectory))
+    g = DiGraph(N)
     node_styles = Dict()
     node_tags = fill("", nv(g))
     for i in 1:nv(g)

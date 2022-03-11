@@ -371,14 +371,17 @@ md"""
 # Trajectory plotting
 """
 
+# ╔═╡ 2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
+N = 20
+
 # ╔═╡ 69e64da0-121d-4432-87e2-d9d3441725dd
-plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp")
+plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N)
 
 # ╔═╡ 281a7c2d-b1ce-4b33-b227-f3b2a6237725
-plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite")
+plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite"; N=N)
 
 # ╔═╡ cacc6e08-b2c0-4ec3-a768-fa3eb8308789
-plot_trajectory(mdp, mdp_trajectory, "traj_mdp")
+plot_trajectory(mdp, mdp_trajectory, "traj_mdp"; N=N)
 
 # ╔═╡ 9a142f50-9c0b-4d5a-807d-07d4992b5155
 md"""
@@ -466,9 +469,10 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═466f9de5-2df5-48a3-b481-7a45858410ae
 # ╟─5e000528-bdae-43a7-bd58-a7e2fb3d80be
 # ╠═00e07de2-e92b-499d-b446-595a968b1ecc
-# ╠═69e64da0-121d-4432-87e2-d9d3441725dd
-# ╠═281a7c2d-b1ce-4b33-b227-f3b2a6237725
+# ╠═2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
 # ╠═cacc6e08-b2c0-4ec3-a768-fa3eb8308789
+# ╠═281a7c2d-b1ce-4b33-b227-f3b2a6237725
+# ╠═69e64da0-121d-4432-87e2-d9d3441725dd
 # ╟─9a142f50-9c0b-4d5a-807d-07d4992b5155
 # ╠═d3ffbfb2-38ff-4003-a93b-0c804d90d8fc
 # ╠═f1e42b93-d895-4706-8044-9863c65908e7
