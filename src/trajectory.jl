@@ -81,7 +81,7 @@ _color_accept = "green!70!black"
 _color_reject = "red!70!black"
 _visa_status_labels = ["ISIS", "VulAfghan", "P1/P2", "SIV", "AMCIT", ""]
 
-function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(trajectory))
+function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(trajectory), show_belief=false)
     half = N÷2 + 1
     N += 1
     g = DiGraph(N+1)
@@ -118,12 +118,21 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
         color = nodei == nv(g) ? "gray" : color
         rcolor = r <= 0 ? _color_reject : _color_accept
 
+        if show_belief
+            plt = plot_claims_tiny(b.b)
+            belief_name = filename*"_belief$i.pdf"
+            savefig(plt, belief_name)
+            belief = "{\\includegraphics[scale=0.4]{$belief_name}}\\\\"
+        else
+            belief = ""
+        end
+
         node_styles[nodei] =
         "circle, draw=black, fill=$color, minimum size=$(f)mm,
          label={[align=center]below:\$t_{$t}\$\\\\
                 \$(c_{$c})\$\\\\
                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-         label={[align=center]above:$(_visa_status_labels[Int(v)+1]) $obs}"
+         label={[align=center]above:$belief$(_visa_status_labels[Int(v)+1]) $obs}"
     end
     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
                          options="grow'=right, level distance=22mm, semithick, >=stealth'")

@@ -113,18 +113,6 @@ println()
 # ╔═╡ 2d58015e-1e3d-4000-ae68-5d5222fa8101
 mdpdata = experiments(1000, mdp, mdp_policy)
 
-# ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
-# pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
-
-# ╔═╡ b2f56210-7de8-4cf2-9f54-1982dde001d8
-# pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
-
-# ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
-BSON.@save "pomdpdata.bson" pomdpdata
-
-# ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
-BSON.@save "pomdplitedata.bson" pomdplitedata
-
 # ╔═╡ 7b608351-17ef-4dd9-aa17-1c69bacd47d9
 BSON.@save "mdpdata.bson" mdpdata
 
@@ -276,8 +264,20 @@ end
 # ╔═╡ 6fe49d6b-343a-4250-8744-a6ba734e51d0
 pomcp_policy_lite = solve_pomdp(POMCPSolver, pomdplite);
 
+# ╔═╡ b2f56210-7de8-4cf2-9f54-1982dde001d8
+pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
+
+# ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
+BSON.@save "pomdplitedata.bson" pomdplitedata
+
 # ╔═╡ e1be8687-43db-46e9-99ad-eff59c3c2985
 pomcp_policy = solve_pomdp(POMCPSolver, pomdp)
+
+# ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
+pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
+
+# ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
+BSON.@save "pomdpdata.bson" pomdpdata
 
 # ╔═╡ 7a301ad6-e31f-4d20-b527-a26573473c0e
 begin
