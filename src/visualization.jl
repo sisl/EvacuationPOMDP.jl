@@ -9,6 +9,7 @@ cmap = ColorScheme([afghan_red, afghan_green])
 cmap_bar = ColorScheme([afghan_red, colorant"lightgray", afghan_green])
 
 visa_statuses = ["ISIS-K", "Vul. Afghan", "P1/P2 Afghan", "SIV", "AMCIT"] # NOTE: ordering
+visa_statuses_short = ["ISIS", "Afg.", "P1/P2", "SIV", "AMCIT"] # NOTE: ordering
 
 
 function plot_claims(p; small=false, text="", xticks=false, legend=false, kwargs...)
@@ -106,13 +107,16 @@ function vis_time_step(params, policy, c, t)
          legend = :none, 
          xlims = (x[1], x[end]),
          ylims = (params.family_sizes[1], params.family_sizes[end]),
+         yticks = (params.family_sizes[1]:params.family_sizes[end], [1, "", "", 4, "", "", 7, "", "", 10, "", "", 13]),
+         xticks = (x[1]:x[end], visa_statuses_short),
          xlabel = "visa status",
          ylabel = "family size",
          title = titleX,
          xtickfont = font(6, "Courier"), 
          ytickfont = font(6, "Courier"),
          thickness_scaling = .9,
-         color=cmap.colors,   
+         rightmargin = 5Plots.mm,
+         color=cmap.colors,
     )
 end
 

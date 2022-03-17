@@ -130,8 +130,8 @@ end
     p_amcit = normalize([0, 0, 0, 0.0, 1.0], 1)
     p_siv = normalize([0, 0, 0, 0.99, 0.01], 1)
     p_p1p2 = normalize([0, 0, 0.95, 0.04, 0.01], 1)
-    p_afghan = normalize([0, 0.95, 0.1, 0.009, 0.005], 1)
-    p_isis = normalize([0.01, 0.94, 0.04, 0.009, 0.001], 1)
+    p_afghan = normalize([0, 0.94, 0.05, 0.009, 0.001], 1)
+    p_isis = normalize([0.9, 0.09, 0.005, 0.005, 0], 1)
 end
 
 
@@ -153,7 +153,7 @@ end
 @with_kw mutable struct EvacuationPOMDPType <: MOMDP{VisibleState, HiddenState, Action, Observation}
     params::EvacuationParameters = EvacuationParameters()
     claims::ClaimModel = ClaimModel()
-    visa_count = params.visa_count # updated as a Dirichlet, used in 𝑇(s′ | s, a)
+    visa_count = ones(length(params.visa_count)) # uniform prior updated as a Dirichlet, used in 𝑇(s′ | s, a)
     null_state = POMDPState((VisibleState(-1,-1,-1), HiddenState(NULL)))
     documentation = [ISIS_indicator, VulAfghan_document, P1P2Afghan_document, SIV_document, AMCIT_document]
     isnoisy = true

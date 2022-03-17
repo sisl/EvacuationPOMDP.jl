@@ -74,11 +74,12 @@ end
 
 function manual_simulate(pomdp::EvacuationPOMDPType, policy, up::Updater, population; include_all=false)
     first_fam = popfirst!(population)
+    reset_population_belief!(pomdp)
     _s = rand(initialstate(pomdp))
     s = newstate(POMDPState, visible(_s).c, visible(_s).t, first_fam.family_size, first_fam.status)
     Random.seed!(0) # TODO.
     o0 = rand(observation(pomdp, s, REJECT, s))
-    prior_belief = initialize_belief(up, pomdp.params.visa_count, s)
+    prior_belief = initialize_belief(up, pomdp.visa_count, s)
     b = update(up, prior_belief, REJECT, o0)
     τ = []
 
@@ -120,7 +121,8 @@ function simulation(pomdp::POMDP, policy, population=nothing)
     if isnothing(population)
         initial_state = rand(initialstate(pomdp))
         initial_obs = rand(observation(pomdp, initial_state, REJECT, initial_state))
-        prior_belief = initialize_belief(up, pomdp.params.visa_count, initial_state)
+        reset_population_belief!(pomdp)
+        prior_belief = initialize_belief(up, pomdp.visa_count, initial_state)
         initial_belief = update(up, prior_belief, REJECT, initial_obs)
         hr = HistoryRecorder()
         history = simulate(hr, pomdp, policy, up, initial_belief, initial_state)

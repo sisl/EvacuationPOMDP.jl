@@ -64,7 +64,8 @@ include("common.jl")
 include("mdp.jl")
 
 export
-    likelihood
+    likelihood,
+    reset_population_belief!
 include("pomdp.jl")
 
 export

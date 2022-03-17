@@ -165,7 +165,7 @@ function update(up::DiscreteSubspaceUpdater, b::DiscreteSubspaceBelief, a, o)
 
     # update counts based on the belief
     α′ = copy(α) + bp
-    up.momdp.visa_count = α′ # Update MOMDP type (to be used in `transition`)
+    up.momdp.visa_count = deepcopy(α′) # Update MOMDP type (to be used in `transition`)
 
     return DiscreteSubspaceBelief(momdp, b.hidden_state_list, bp, α′, sv)
 end

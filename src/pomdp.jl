@@ -181,3 +181,7 @@ function POMDPs.observation(pomdp::EvacuationPOMDPType, sh::HiddenState, a::Acti
     end
 end
 
+
+function reset_population_belief!(pomdp::EvacuationPOMDPType)
+    pomdp.visa_count = ones(length(pomdp.visa_count))
+end

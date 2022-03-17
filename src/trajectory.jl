@@ -1,10 +1,11 @@
-function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing)
+function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing, verbose=false)
     up = updater(pomdp)
     trajectory = []
 
     if isnothing(seed)
+        reset_population_belief!(pomdp)
         s₀ = rand(initialstate(pomdp))
-        prior_belief = initialize_belief(up, pomdp.params.visa_count, visible(s₀))
+        prior_belief = initialize_belief(up, pomdp.visa_count, visible(s₀))
         o₀ = rand(observation(pomdp, s₀, REJECT, s₀))
         initial_belief = update(up, prior_belief, REJECT, o₀)
         iterator = enumerate(stepthrough(pomdp, pomdp_policy, up, initial_belief, s₀, "s,a,r,sp,b,o", max_steps=130))
@@ -16,25 +17,28 @@ function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing)
     end
     
     for (t, (s, a, r, sp, b, o)) in iterator
-        @show t
-        println("Capacity=$(visible(s).c), time remaining=$(visible(s).t)")
-        println(hidden(s).v," of size ", visible(s).f)
-        if a == ACCEPT
-            println("\t——————ACCEPT—————— ✅")
-            @info ACCEPT, t
-        else
-            println("\t(reject) ❌")
+        a == ACCEPT && @info ACCEPT, t
+        if verbose
+            @show t
+            println("Capacity=$(visible(s).c), time remaining=$(visible(s).t)")
+            println(hidden(s).v," of size ", visible(s).f)
+            if a == ACCEPT
+                println("\t——————ACCEPT—————— ✅")
+                @info ACCEPT, t
+            else
+                println("\t(reject) ❌")
+            end
+            @show o
+            @show round.(b.b, digits=3)
+            @show VisaStatus(argmax(b.b) - 1) # 0-based enums
+            if hidden(s).v != VisaStatus(argmax(b.b) - 1)
+                @show "~~~~~ M I S M A T C H ~~~~~"
+                @warn "mismatch ($t)" # Only happens in the noisy case due to sampling
+            end
+            println(hidden(sp).v," of size ", visible(sp).f)
+            @show r
+            println("—"^20)
         end
-        @show o
-        @show round.(b.b, digits=3)
-        @show VisaStatus(argmax(b.b) - 1) # 0-based enums
-        if hidden(s).v != VisaStatus(argmax(b.b) - 1)
-            @show "~~~~~ M I S M A T C H ~~~~~"
-            @warn "mismatch ($t)" # Only happens in the noisy case due to sampling
-        end
-        println(hidden(sp).v," of size ", visible(sp).f)
-        @show r
-        println("—"^20)
         push!(trajectory, (s,a,o,b,r))
     end
 
@@ -46,7 +50,7 @@ function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing)
 end
 
 
-function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing)
+function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing, verbose=false)
     trajectory = []
     
     if isnothing(seed)
@@ -58,18 +62,20 @@ function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing)
     end
 
     for (t, (s, a, r, sp)) in iterator
-        @show t
-        println("Capacity=$(s.c), time remaining=$(s.t)")
-        println(s.v," of size ", s.f)
-        if a == ACCEPT
-            println("\t——————ACCEPT—————— ✅")
-            @info ACCEPT, t
-        else
-            println("\t(reject) ❌")
+        if verbose
+            @show t
+            println("Capacity=$(s.c), time remaining=$(s.t)")
+            println(s.v," of size ", s.f)
+            if a == ACCEPT
+                println("\t——————ACCEPT—————— ✅")
+                @info ACCEPT, t
+            else
+                println("\t(reject) ❌")
+            end
+            println(sp.v," of size ", sp.f)
+            @show r
+            println("—"^20)
         end
-        println(sp.v," of size ", sp.f)
-        @show r
-        println("—"^20)
         push!(trajectory, (s,a,r))
     end
 
@@ -81,7 +87,7 @@ _color_accept = "green!70!black"
 _color_reject = "red!70!black"
 _visa_status_labels = ["ISIS", "VulAfghan", "P1/P2", "SIV", "AMCIT", ""]
 
-function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(trajectory), show_belief=false)
+function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(trajectory), show_belief=false, show_population=false)
     half = N÷2 + 1
     N += 1
     g = DiGraph(N+1)
@@ -127,12 +133,23 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
             belief = ""
         end
 
+        if show_population
+            plt_pop = plot_claims_tiny(normalize(b.counts, 1))
+            pop_belief_name = filename*"_pop_belief$i.pdf"
+            savefig(plt_pop, pop_belief_name)
+            pop_belief = "{\\includegraphics[scale=0.4]{$pop_belief_name}}\\\\"
+        else
+            pop_belief = ""
+        end
+
+        
+
         node_styles[nodei] =
         "circle, draw=black, fill=$color, minimum size=$(f)mm,
          label={[align=center]below:\$t_{$t}\$\\\\
                 \$(c_{$c})\$\\\\
                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-         label={[align=center]above:$belief$(_visa_status_labels[Int(v)+1]) $obs}"
+         label={[align=center]above:$pop_belief$belief$(_visa_status_labels[Int(v)+1]) $obs}"
     end
     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
                          options="grow'=right, level distance=22mm, semithick, >=stealth'")

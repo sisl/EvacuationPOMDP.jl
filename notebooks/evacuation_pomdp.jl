@@ -55,9 +55,6 @@ using BasicPOMCP
 # ╔═╡ d4d4de96-b8aa-484d-b594-afb48dd472bc
 using D3Trees
 
-# ╔═╡ 00e07de2-e92b-499d-b446-595a968b1ecc
-using TikzGraphs
-
 # ╔═╡ 41d0fe72-b83d-4cf8-bc91-44b0e8f561eb
 TableOfContents()
 
@@ -113,6 +110,19 @@ println()
 # ╔═╡ 2d58015e-1e3d-4000-ae68-5d5222fa8101
 mdpdata = experiments(1000, mdp, mdp_policy)
 
+# ╔═╡ 8d98f5fc-9f8f-4cb2-a791-3e1a987ed56e
+function annotate_policy!(k, x, y)
+	pos = :left
+	if k == "POMDP-lite"
+		x, y = (x-24, y)
+	elseif k == "Random"
+		x, y = (x-2, y+25)
+	else
+		x, y = x < 120 ? (x-1, y+20) : (x, y)
+	end	
+	annotate!([(x+2, y, (k, 7, pos))])
+end
+
 # ╔═╡ 7b608351-17ef-4dd9-aa17-1c69bacd47d9
 BSON.@save "mdpdata.bson" mdpdata
 
@@ -126,21 +136,6 @@ function mismatch_mean(A)
     max_length = maximum(map(length, A))
     Z = [map(a->i <= length(a) ? a[i] : nothing, A) for i in 1:max_length]
     return map(mean, map(z->filter(!isnothing, z), Z))
-end
-
-# ╔═╡ af739bac-2f7d-4c5e-93d4-2b1377509239
-begin
-	plot = EvacuationPOMDP.plot
-	plot! = EvacuationPOMDP.plot!
-	plot()
-	for k in keys(mdpdata)
-		# k ∉ ["MDP", "Random"] && continue
-		plot!(mismatch_mean(mdpdata[k]["list_reward_over_time"]),
-			  # ribbon=mismatch_std(mdpdata[k]["list_reward_over_time"])/10,
-			  fillalpha=0.5, label=k)
-	end
-	plot!(ylims=(-50, 20), 
-		  xlabel="simulation time", ylabel="reward", legend=:bottomleft)
 end
 
 # ╔═╡ 8d2b9590-8d76-4675-9b8a-e6a47cbccb8c
@@ -167,13 +162,38 @@ md"""
 # Claim models
 """
 
+# ╔═╡ 9babaea3-5ed9-4349-ba5b-95f9549213eb
+begin
+	# pgfplotsx()
+	claim_plot = plot_all_claims(EvacuationPOMDPType())
+	# gr()
+	claim_plot
+end
+
+# ╔═╡ 29798743-18cc-4c7b-af0d-ffb962a3eec9
+savefig(claim_plot, "claim_plot.tex")
+
+# ╔═╡ 67d3b29c-4aeb-45df-a449-cd669590fb58
+EvacuationPOMDPType().claims
+
+# ╔═╡ 59c54092-e44e-422c-a29d-3fc457718190
+sum([0.95, 0.045, 0.004, 0.001])
+
 # ╔═╡ 470e32ce-57da-48b6-a27e-0899083a47a3
 md"""
 # MDP policy plot
 """
 
 # ╔═╡ 40430b14-07b2-40c6-95fe-9f60a5c6e75f
-vis_all(mdp.params, mdp_policy)
+begin
+	# pgfplotsx()
+	policy_plot = vis_all(mdp.params, mdp_policy)
+	# gr()
+	policy_plot
+end
+
+# ╔═╡ 34b70a62-622e-41e3-a865-7cbd8b6a8fb5
+savefig(policy_plot, "policy_plot.tex")
 
 # ╔═╡ 57c7d1f6-9920-464d-8b14-563fccd6878f
 # vis_all(mdp.params, pomcp_policy) # requires action(policy, belief) NOTE `belief`.
@@ -209,17 +229,17 @@ plot_family_size_distribution(pomdp.params.family_prob)
 # ╔═╡ 67139013-44dc-4f83-afcc-eb3aaacb0eab
 pomdp.params.visa_prob
 
-# ╔═╡ 9babaea3-5ed9-4349-ba5b-95f9549213eb
-claim_plot = plot_all_claims(pomdp)
-
-# ╔═╡ 29798743-18cc-4c7b-af0d-ffb962a3eec9
-savefig(claim_plot, "claim_plot.pdf")
-
 # ╔═╡ d112f66b-bd60-480c-9fc3-275b90206e6c
 transitionhidden(pomdp, HiddenState(AMCIT), ACCEPT)
 
 # ╔═╡ 40c84bf1-88c8-47d3-9a5b-6f9308d883e8
 observation(pomdp, sh_test, ACCEPT, shp_test)
+
+# ╔═╡ f094c09e-2f51-4b1b-81cb-a6832baccb92
+normalize(pomdp.visa_count, 1) |> plot_claims
+
+# ╔═╡ 36c1fe73-2559-4f9e-95f3-3e79ed0c0264
+pomdp.visa_count
 
 # ╔═╡ c08f9f26-46d0-405a-80d9-6b766af0bf44
 md"""
@@ -231,6 +251,15 @@ pomdplite = EvacuationPOMDPType(isnoisy=false)
 
 # ╔═╡ fded8908-5b32-4e81-9ef1-0fc4349303c9
 observation(pomdplite, sh_test, ACCEPT, shp_test)
+
+# ╔═╡ 6986006a-dd3e-41ce-8255-1beed5b772a7
+pomdplite.visa_count
+
+# ╔═╡ fe03b798-c728-4033-bba2-e8a3de80b1c7
+normalize(pomdplite.visa_count, 1) |> plot_claims
+
+# ╔═╡ 53444381-2249-42fd-8129-724b885938c4
+pomdplite.visa_count
 
 # ╔═╡ 5629a62b-0532-4736-aa8b-e814192ed9c0
 md"""
@@ -254,7 +283,7 @@ function solve_pomdp(::Type{POMCPSolver}, pomdp::EvacuationPOMDPType)
 
 	pomcp_solver = POMCPSolver(
 		max_depth=10,
-		tree_queries=1000,
+		tree_queries=100,
 		estimate_value=rollout_estimator)
 	
 	pomcp_policy = solve(pomcp_solver, pomdp)
@@ -270,11 +299,50 @@ pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
 # ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
 BSON.@save "pomdplitedata.bson" pomdplitedata
 
-# ╔═╡ e1be8687-43db-46e9-99ad-eff59c3c2985
+# ╔═╡ c9e3d5ee-f0d1-4bd3-9d9c-4ddeab2e87d3
 pomcp_policy = solve_pomdp(POMCPSolver, pomdp)
 
 # ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
 pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
+
+# ╔═╡ af739bac-2f7d-4c5e-93d4-2b1377509239
+begin
+	# plot = EvacuationPOMDP.plot
+	# plot! = EvacuationPOMDP.plot!
+	pgfplotsx()
+	plot()
+	hline!([0], c=:gray, lw=1, label=false)
+	vline!([120-20+1], c=:gray, lw=0.5, label=false, style=:dash)
+	annotate!([(120-20, -850, ("Threshold (AMCITs)", 7, :right, :gray))])
+	policy_keys = ["MDP", "POMDP-lite", "POMDP", "AMCITs", "SIV-AMCITs", "AcceptAll", "AfterThresholdAMCITs", "BeforeThresholdAMCITs", "Random"]
+	colors = [:magenta, :red, :darkorange, :gold, :green, :cyan, :blue, :purple, :black]
+	for (i,k) in enumerate(policy_keys)
+		style = occursin("Threshold", k) ? :dash : :solid
+		style = k == "Random" ? :dot : style
+		if k in keys(mdpdata)
+			data = mdpdata[k]
+		elseif k in keys(pomdplitedata)
+			data = pomdplitedata[k]
+		elseif k in keys(pomdpdata)
+			data = pomdpdata[k]
+		end
+		μ_cumulative_reward = cumsum(mismatch_mean(data["list_reward_over_time"]))
+		# σ_cumulative_reward = sqrt.(cumsum(mismatch_std(data["list_reward_over_time"])))
+		plot!(μ_cumulative_reward,
+			  # ribbon=σ_cumulative_reward,
+			  fillalpha=0.5, lw=2, label=k, style=style, c=colors[i])
+		annotate_policy!(k, length(μ_cumulative_reward), last(μ_cumulative_reward))
+		scatter!([length(μ_cumulative_reward)], [last(μ_cumulative_reward)], label=false, c=colors[i], ms=3)
+	end
+
+	plot!(xlabel="simulation time", ylabel="mean cumulative reward", legend=:bottomleft, title="cumulative reward for each policy")
+	agg_plot = xlims!(1, xlims()[2]+37)
+	gr()
+	agg_plot
+end
+
+# ╔═╡ 6d708221-9d27-4e14-a621-420128f2faa3
+savefig(agg_plot, "agg_plot.tex")
 
 # ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
 BSON.@save "pomdpdata.bson" pomdpdata
@@ -297,7 +365,7 @@ up = DiscreteSubspaceUpdater(pomdp)
 begin
 	Random.seed!(0)
 	sv₀ = VisibleState(pomdp.params.capacity, pomdp.params.time, 1)
-	b₀ = initialize_belief(up, pomdp.params.visa_count, sv₀)
+	b₀ = initialize_belief(up, pomdp.visa_count, sv₀)
 	online_action, info = action_info(pomcp_policy, b₀, tree_in_info=true)
 	online_action
 end
@@ -315,8 +383,10 @@ md"""
 
 # ╔═╡ 40a6caa8-7f10-4816-ba65-bb4c49053775
 begin
-	sv = VisibleState(pomdp.params.capacity, pomdp.params.time, 1)
-	b′ = initialize_belief(up, pomdp.params.visa_count, sv)
+	localpomdp = EvacuationPOMDPType()
+	sv = VisibleState(localpomdp.params.capacity, localpomdp.params.time, 1)
+	reset_population_belief!(localpomdp)
+	b′ = initialize_belief(up, localpomdp.visa_count, sv)
 	# b′(sv)
 
 	@info "Initial" plot_claims(b′.b)
@@ -327,18 +397,18 @@ begin
 		spacing = "\n"^2num_updates
 		# vdoc = documentation[rand(𝒟_true)]
 		# o = Observation(sv.c, sv.t, sv.f, vdoc)
-		sp = rand(transition(pomdp, s, a))
+		sp = rand(transition(localpomdp, s, a))
 		if isterminal(pomdp, sp)
 			@warn "Terminal!"
 			break
 		end
-		o = rand(observation(pomdp, s, a, sp))
+		o = rand(observation(localpomdp, s, a, sp))
 		b′ = update(up, b′, a, o)
-		@info spacing hidden(sp).v o.vdoc plot_claims(b′.b)
+		@info spacing hidden(sp).v o.vdoc plot_claims(b′.b) plot_claims(normalize(b′.counts,1))
 		s = sp
 	end
 	# [mean(b′) b′.b]
-	plot_claims(b′.b)
+	[plot_claims(b′.b), plot_claims(normalize(b′.counts,1))]
 end
 
 # ╔═╡ f1914e6d-8dd2-4412-af20-93530ef0d030
@@ -388,9 +458,6 @@ end
 # ╔═╡ 9c10c8d3-71a7-422b-b24e-8e2cb2997cca
 map(t->t[end-1].b, pomdp_trajectory[end-2:end])
 
-# ╔═╡ cd3e1287-979d-46f3-84a2-51f97739f409
-pomdp_trajectory[end-2:end]
-
 # ╔═╡ 5e000528-bdae-43a7-bd58-a7e2fb3d80be
 md"""
 # Trajectory plotting
@@ -403,10 +470,13 @@ N = 20
 plot_trajectory(mdp, mdp_trajectory, "traj_mdp"; N=N)
 
 # ╔═╡ 281a7c2d-b1ce-4b33-b227-f3b2a6237725
-plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite"; N=N)
+plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite"; N=N, show_population=true)
 
-# ╔═╡ 69e64da0-121d-4432-87e2-d9d3441725dd
-plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N)
+# ╔═╡ edabc978-aaec-4a09-a234-4fa9caf2b58e
+plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N, show_belief=true, show_population=true)
+
+# ╔═╡ 1951a3db-fdfe-4630-ab6e-17c56f5e4913
+pomdp_trajectory[end][end-1]
 
 # ╔═╡ 9a142f50-9c0b-4d5a-807d-07d4992b5155
 md"""
@@ -441,8 +511,10 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═4f9b0d74-73d5-42e9-9ee6-178797ac023c
 # ╠═2d58015e-1e3d-4000-ae68-5d5222fa8101
 # ╠═af739bac-2f7d-4c5e-93d4-2b1377509239
-# ╠═d0407ec6-3566-409c-a53a-7b9e0501c4ad
+# ╠═6d708221-9d27-4e14-a621-420128f2faa3
+# ╠═8d98f5fc-9f8f-4cb2-a791-3e1a987ed56e
 # ╠═b2f56210-7de8-4cf2-9f54-1982dde001d8
+# ╠═d0407ec6-3566-409c-a53a-7b9e0501c4ad
 # ╠═c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
 # ╠═e24fb800-57fb-4a7e-8c48-b349b661ae93
 # ╠═7b608351-17ef-4dd9-aa17-1c69bacd47d9
@@ -455,8 +527,11 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═67139013-44dc-4f83-afcc-eb3aaacb0eab
 # ╠═9babaea3-5ed9-4349-ba5b-95f9549213eb
 # ╠═29798743-18cc-4c7b-af0d-ffb962a3eec9
+# ╠═67d3b29c-4aeb-45df-a449-cd669590fb58
+# ╠═59c54092-e44e-422c-a29d-3fc457718190
 # ╟─470e32ce-57da-48b6-a27e-0899083a47a3
 # ╠═40430b14-07b2-40c6-95fe-9f60a5c6e75f
+# ╠═34b70a62-622e-41e3-a865-7cbd8b6a8fb5
 # ╠═57c7d1f6-9920-464d-8b14-563fccd6878f
 # ╟─958c44ef-9c64-484c-ae80-0a62f2142225
 # ╠═d112f66b-bd60-480c-9fc3-275b90206e6c
@@ -468,8 +543,13 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═4efe4359-7041-45c9-bedf-939a41954831
 # ╟─f66f2579-d2d4-4a5b-9805-4922dbb99e9b
 # ╠═27bd873f-c7b1-4323-99e3-6f6be02eb8b5
+# ╠═f094c09e-2f51-4b1b-81cb-a6832baccb92
+# ╠═36c1fe73-2559-4f9e-95f3-3e79ed0c0264
 # ╟─c08f9f26-46d0-405a-80d9-6b766af0bf44
 # ╠═4cb1fb17-523e-4eab-a9e7-7e1bf0b9edde
+# ╠═6986006a-dd3e-41ce-8255-1beed5b772a7
+# ╠═fe03b798-c728-4033-bba2-e8a3de80b1c7
+# ╠═53444381-2249-42fd-8129-724b885938c4
 # ╠═6fe49d6b-343a-4250-8744-a6ba734e51d0
 # ╟─5629a62b-0532-4736-aa8b-e814192ed9c0
 # ╠═8aeff62d-6c27-4f6b-9b0d-8d18df1c2902
@@ -477,7 +557,7 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╟─6349762b-1c5e-4b9b-b2eb-90573f19313e
 # ╠═05870354-856b-4342-8dce-00219b602342
 # ╠═80aef6fb-6c23-41a9-a0e1-76d7a04c503a
-# ╠═e1be8687-43db-46e9-99ad-eff59c3c2985
+# ╠═c9e3d5ee-f0d1-4bd3-9d9c-4ddeab2e87d3
 # ╠═85a03af8-4734-48ee-8c6d-a8905e1f2feb
 # ╠═d4d4de96-b8aa-484d-b594-afb48dd472bc
 # ╠═7fdc98bb-0c88-434f-99ed-e7876df3c6e2
@@ -491,18 +571,17 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═9f2b615d-4187-424f-adb5-f092c78faec5
 # ╠═3b3110a8-8322-404f-8ad9-f4361640666e
 # ╠═9c10c8d3-71a7-422b-b24e-8e2cb2997cca
-# ╠═cd3e1287-979d-46f3-84a2-51f97739f409
 # ╟─f429f2b4-959b-4ed2-bd49-6ba961ba2382
 # ╠═38b970ed-0fc2-44d4-bf0d-4ad5fa70d1ff
 # ╠═466f9de5-2df5-48a3-b481-7a45858410ae
 # ╠═7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
 # ╠═ff841f9f-0603-4d05-a820-736a4cc62e3d
 # ╟─5e000528-bdae-43a7-bd58-a7e2fb3d80be
-# ╠═00e07de2-e92b-499d-b446-595a968b1ecc
 # ╠═2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
 # ╠═f2d91ff3-db6d-41eb-89cb-85711048922c
 # ╠═281a7c2d-b1ce-4b33-b227-f3b2a6237725
-# ╠═69e64da0-121d-4432-87e2-d9d3441725dd
+# ╠═edabc978-aaec-4a09-a234-4fa9caf2b58e
+# ╠═1951a3db-fdfe-4630-ab6e-17c56f5e4913
 # ╟─9a142f50-9c0b-4d5a-807d-07d4992b5155
 # ╠═d3ffbfb2-38ff-4003-a93b-0c804d90d8fc
 # ╠═f1e42b93-d895-4706-8044-9863c65908e7
