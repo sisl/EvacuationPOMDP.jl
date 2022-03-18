@@ -117,7 +117,7 @@ function POMDPs.observation(pomdp::EvacuationPOMDPType, s::POMDPState, a::Action
         return Deterministic(
             Observation(sv.c, sv.t, sv.f, NULL_document))
     else
-        if pomdp.isnoisy
+        if pomdp.individual_uncertainty
             if sh.v == AMCIT
                 p = copy(pomdp.claims.p_amcit)
             elseif sh.v == SIV
@@ -154,7 +154,7 @@ function POMDPs.observation(pomdp::EvacuationPOMDPType, sh::HiddenState, a::Acti
     if isnothing(sₕ_idx) # null state
         return Deterministic(NULL_document)
     else
-        if pomdp.isnoisy
+        if pomdp.individual_uncertainty
             if state.v == AMCIT
                 p = copy(pomdp.claims.p_amcit)
             elseif state.v == SIV
@@ -183,5 +183,9 @@ end
 
 
 function reset_population_belief!(pomdp::EvacuationPOMDPType)
-    pomdp.visa_count = ones(length(pomdp.visa_count))
+    if pomdp.population_uncertainty
+        pomdp.visa_count = ones(length(pomdp.visa_count))
+    else
+        pomdp.visa_count = deepcopy(pomdp.params.visa_count)
+    end
 end

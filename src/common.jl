@@ -153,10 +153,11 @@ end
 @with_kw mutable struct EvacuationPOMDPType <: MOMDP{VisibleState, HiddenState, Action, Observation}
     params::EvacuationParameters = EvacuationParameters()
     claims::ClaimModel = ClaimModel()
-    visa_count = ones(length(params.visa_count)) # uniform prior updated as a Dirichlet, used in 𝑇(s′ | s, a)
     null_state = POMDPState((VisibleState(-1,-1,-1), HiddenState(NULL)))
     documentation = [ISIS_indicator, VulAfghan_document, P1P2Afghan_document, SIV_document, AMCIT_document]
-    isnoisy = true
+    individual_uncertainty = true
+    population_uncertainty = true
+    visa_count = population_uncertainty ? ones(length(params.visa_count)) : deepcopy(params.visa_count) # uniform prior updated as a Dirichlet, used in 𝑇(s′ | s, a)
 end
 
 

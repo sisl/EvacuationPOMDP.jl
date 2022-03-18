@@ -73,7 +73,10 @@ export
     AMCITsPolicy,
     SIVAMCITsPolicy,
     AfterThresholdAMCITsPolicy,
-    BeforeThresholdAMCITsPolicy
+    BeforeThresholdAMCITsPolicy,
+    RandomBaselinePolicy,
+    MDPRolloutPolicy,
+    SIVAMCITsP1P2Policy
 include("policies.jl")
 
 

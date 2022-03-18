@@ -275,19 +275,19 @@ end
 function experiments(n_sims, mdp::EvacuationMDP, mdp_policy)
     # policies and n_sims can probably be put in our params function as a list. here for now.
     dict_policies = Dict(
-        "MDP"=>mdp_policy,
+        "Level I"=>mdp_policy,
         "Random"=>RandomBaselinePolicy(),
         "AcceptAll"=>AcceptAllPolicy(),
         "AMCITs"=>AMCITsPolicy(),
         "SIV-AMCITs"=>SIVAMCITsPolicy(),
+        "SIV-AMCITs-P1P2"=>SIVAMCITsP1P2Policy(),
         "AfterThresholdAMCITs"=>AfterThresholdAMCITsPolicy(mdp_policy=mdp_policy),
         "BeforeThresholdAMCITs"=>BeforeThresholdAMCITsPolicy(mdp_policy=mdp_policy),
     )
 
     aggdata = Dict()
     for str_policy in sort(collect(keys(dict_policies)))
-        xmdp = contains(str_policy, "pomdp") ? pomdp : mdp
-        data = simulations(dict_policies[str_policy], str_policy, xmdp, n_sims)
+        data = simulations(dict_policies[str_policy], str_policy, mdp, n_sims)
         aggdata = merge(aggdata, data)
     end
 

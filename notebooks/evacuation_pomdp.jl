@@ -108,7 +108,7 @@ end
 println()
 
 # ╔═╡ 2d58015e-1e3d-4000-ae68-5d5222fa8101
-mdpdata = experiments(1000, mdp, mdp_policy)
+level1data = experiments(1000, mdp, mdp_policy)
 
 # ╔═╡ 8d98f5fc-9f8f-4cb2-a791-3e1a987ed56e
 function annotate_policy!(k, x, y)
@@ -123,13 +123,11 @@ function annotate_policy!(k, x, y)
 	annotate!([(x+2, y, (k, 7, pos))])
 end
 
-# ╔═╡ 7b608351-17ef-4dd9-aa17-1c69bacd47d9
-BSON.@save "mdpdata.bson" mdpdata
+# ╔═╡ 118ab216-0548-4ec4-b933-cedf78f08c55
+BSON.@save "level1data.bson" level1data
 
 # ╔═╡ a17792e3-d4fb-498c-bf8b-d25f9e9efc5c
-with_terminal() do
-	println("Hello!")
-end
+mean_std(map(sum, level1data["Level I"]["list_reward_over_time"]), false)
 
 # ╔═╡ dd15d7f4-a163-44d4-8f8f-7915a78ed4f6
 function mismatch_mean(A)
@@ -165,13 +163,14 @@ md"""
 # ╔═╡ 9babaea3-5ed9-4349-ba5b-95f9549213eb
 begin
 	# pgfplotsx()
+	gr()
 	claim_plot = plot_all_claims(EvacuationPOMDPType())
 	# gr()
 	claim_plot
 end
 
 # ╔═╡ 29798743-18cc-4c7b-af0d-ffb962a3eec9
-savefig(claim_plot, "claim_plot.tex")
+savefig(claim_plot, "claim_plot.pdf")
 
 # ╔═╡ 67d3b29c-4aeb-45df-a449-cd669590fb58
 EvacuationPOMDPType().claims
@@ -187,13 +186,14 @@ md"""
 # ╔═╡ 40430b14-07b2-40c6-95fe-9f60a5c6e75f
 begin
 	# pgfplotsx()
+	gr()
 	policy_plot = vis_all(mdp.params, mdp_policy)
 	# gr()
 	policy_plot
 end
 
 # ╔═╡ 34b70a62-622e-41e3-a865-7cbd8b6a8fb5
-savefig(policy_plot, "policy_plot.tex")
+savefig(policy_plot, "policy_plot.pdf")
 
 # ╔═╡ 57c7d1f6-9920-464d-8b14-563fccd6878f
 # vis_all(mdp.params, pomcp_policy) # requires action(policy, belief) NOTE `belief`.
@@ -221,25 +221,47 @@ md"""
 """
 
 # ╔═╡ 27bd873f-c7b1-4323-99e3-6f6be02eb8b5
-pomdp = EvacuationPOMDPType()
+pomdp_level3 = EvacuationPOMDPType()
 
 # ╔═╡ 3b468bb0-9e90-40b0-9a24-60fba6ca4fc5
-plot_family_size_distribution(pomdp.params.family_prob)
+fam_distr = plot_family_size_distribution(pomdp_level3.params.family_prob)
+
+# ╔═╡ f9b11f1e-04b9-488c-9884-ab0bb77a945c
+savefig(fam_distr, "fam_distr.pdf")
 
 # ╔═╡ 67139013-44dc-4f83-afcc-eb3aaacb0eab
-pomdp.params.visa_prob
+pomdp_level3.params.visa_prob
 
 # ╔═╡ d112f66b-bd60-480c-9fc3-275b90206e6c
-transitionhidden(pomdp, HiddenState(AMCIT), ACCEPT)
+transitionhidden(pomdp_level3, HiddenState(AMCIT), ACCEPT)
 
 # ╔═╡ 40c84bf1-88c8-47d3-9a5b-6f9308d883e8
-observation(pomdp, sh_test, ACCEPT, shp_test)
+observation(pomdp_level3, sh_test, ACCEPT, shp_test)
 
 # ╔═╡ f094c09e-2f51-4b1b-81cb-a6832baccb92
-normalize(pomdp.visa_count, 1) |> plot_claims
+normalize(pomdp_level3.visa_count, 1) |> plot_claims
 
 # ╔═╡ 36c1fe73-2559-4f9e-95f3-3e79ed0c0264
-pomdp.visa_count
+pomdp_level3.visa_count
+
+# ╔═╡ bb444390-3331-446d-b53a-c8fb91da8c05
+md"""
+## Population distribution (true)
+"""
+
+# ╔═╡ 7ba2489f-fc55-4002-bc05-e47876eba660
+begin
+	gr()
+	plot_claims(normalize(pomdp_level3.params.visa_count, 1))
+	plot!(size=(400,200), xtickfont=(6), bottom_margin=2Plots.mm)
+	ylims!(0 ,0.7)
+	title!("population distribution")
+	xlabel!("priority status")
+	pop_distr_plt = ylabel!("probability")
+end
+
+# ╔═╡ a015b077-2fc6-49b6-a99c-0069cf9dfd7b
+savefig(pop_distr_plt, "pop_distr.pdf")
 
 # ╔═╡ c08f9f26-46d0-405a-80d9-6b766af0bf44
 md"""
@@ -247,19 +269,17 @@ md"""
 """
 
 # ╔═╡ 4cb1fb17-523e-4eab-a9e7-7e1bf0b9edde
-pomdplite = EvacuationPOMDPType(isnoisy=false)
+mdp_level2a = EvacuationPOMDPType(
+	individual_uncertainty=false,
+	population_uncertainty=true)
+
+# ╔═╡ 06167243-febb-4c48-b088-efabacff64f5
+pomdp_level2b = EvacuationPOMDPType(
+	individual_uncertainty=true,
+	population_uncertainty=false)
 
 # ╔═╡ fded8908-5b32-4e81-9ef1-0fc4349303c9
-observation(pomdplite, sh_test, ACCEPT, shp_test)
-
-# ╔═╡ 6986006a-dd3e-41ce-8255-1beed5b772a7
-pomdplite.visa_count
-
-# ╔═╡ fe03b798-c728-4033-bba2-e8a3de80b1c7
-normalize(pomdplite.visa_count, 1) |> plot_claims
-
-# ╔═╡ 53444381-2249-42fd-8129-724b885938c4
-pomdplite.visa_count
+observation(pomdp_level2b, sh_test, ACCEPT, shp_test)
 
 # ╔═╡ 5629a62b-0532-4736-aa8b-e814192ed9c0
 md"""
@@ -267,10 +287,10 @@ md"""
 """
 
 # ╔═╡ 8aeff62d-6c27-4f6b-9b0d-8d18df1c2902
-gen_state = rand(states(pomdp))
+gen_state = rand(states(pomdp_level3))
 
 # ╔═╡ 0c3d6891-74fc-4d39-a0d4-080d929677f8
-@gen(:sp, :o, :r)(pomdp, gen_state, REJECT)
+@gen(:sp, :o, :r)(pomdp_level3, gen_state, REJECT)
 
 # ╔═╡ 6349762b-1c5e-4b9b-b2eb-90573f19313e
 md"""
@@ -279,7 +299,7 @@ md"""
 
 # ╔═╡ 80aef6fb-6c23-41a9-a0e1-76d7a04c503a
 function solve_pomdp(::Type{POMCPSolver}, pomdp::EvacuationPOMDPType)
-	rollout_estimator = FORollout(SIVAMCITsPolicy())
+	rollout_estimator = FORollout(SIVAMCITsP1P2Policy())
 
 	pomcp_solver = POMCPSolver(
 		max_depth=10,
@@ -291,19 +311,34 @@ function solve_pomdp(::Type{POMCPSolver}, pomdp::EvacuationPOMDPType)
 end
 
 # ╔═╡ 6fe49d6b-343a-4250-8744-a6ba734e51d0
-pomcp_policy_lite = solve_pomdp(POMCPSolver, pomdplite);
+pomcp_policy_2a = solve_pomdp(POMCPSolver, mdp_level2a);
 
 # ╔═╡ b2f56210-7de8-4cf2-9f54-1982dde001d8
-pomdplitedata = experiments(1000, pomdplite, pomcp_policy_lite, "POMDP-lite")
+level2adata = experiments(1000, mdp_level2a, pomcp_policy_2a, "Level IIa")
 
 # ╔═╡ e24fb800-57fb-4a7e-8c48-b349b661ae93
-BSON.@save "pomdplitedata.bson" pomdplitedata
+BSON.@save "level2adata.bson" level2adata
+
+# ╔═╡ 10ed9198-8dd3-43e1-b311-d200fc934649
+mean_std(map(sum, level2adata["Level IIa"]["list_reward_over_time"]), false)
+
+# ╔═╡ fe0b9861-f14a-4ecd-bc3a-8cbf70badb97
+pomcp_policy_2b = solve_pomdp(POMCPSolver, pomdp_level2b);
+
+# ╔═╡ b7c4ae6e-148a-4bcc-8bf1-8c0b01ef54d2
+level2bdata = experiments(1000, pomdp_level2b, pomcp_policy_2b, "Level IIb")
+
+# ╔═╡ 595dc813-048c-415b-a98d-d943f8db9328
+BSON.@save "level2bdata.bson" level2bdata
+
+# ╔═╡ 9f7b2cf0-9765-4846-b510-4cd084a4b760
+mean_std(map(sum, level2bdata["Level IIb"]["list_reward_over_time"]), false)
 
 # ╔═╡ c9e3d5ee-f0d1-4bd3-9d9c-4ddeab2e87d3
-pomcp_policy = solve_pomdp(POMCPSolver, pomdp)
+pomcp_policy_3 = solve_pomdp(POMCPSolver, pomdp_level3)
 
 # ╔═╡ d0407ec6-3566-409c-a53a-7b9e0501c4ad
-pomdpdata = experiments(1000, pomdp, pomcp_policy, "POMDP")
+level3data = experiments(1000, pomdp_level3, pomcp_policy_3, "Level III")
 
 # ╔═╡ af739bac-2f7d-4c5e-93d4-2b1377509239
 begin
@@ -314,17 +349,21 @@ begin
 	hline!([0], c=:gray, lw=1, label=false)
 	vline!([120-20+1], c=:gray, lw=0.5, label=false, style=:dash)
 	annotate!([(120-20, -850, ("Threshold (AMCITs)", 7, :right, :gray))])
-	policy_keys = ["MDP", "POMDP-lite", "POMDP", "AMCITs", "SIV-AMCITs", "AcceptAll", "AfterThresholdAMCITs", "BeforeThresholdAMCITs", "Random"]
-	colors = [:magenta, :red, :darkorange, :gold, :green, :cyan, :blue, :purple, :black]
+	policy_keys = ["Level I", "Level IIa", "Level IIb", "Level III", "AMCITs", "SIV-AMCITs",  "SIV-AMCITs-P1P2", "AcceptAll", "AfterThresholdAMCITs", "BeforeThresholdAMCITs", "Random"]
+	# policy_keys = ["Level I", "Level IIa", "Level IIb", "Level III"]
+
+	colors = [:magenta, :crimson, :red, :darkorange, :gold, :lightgreen, :green, :cyan, :blue, :purple, :black]
 	for (i,k) in enumerate(policy_keys)
 		style = occursin("Threshold", k) ? :dash : :solid
 		style = k == "Random" ? :dot : style
-		if k in keys(mdpdata)
-			data = mdpdata[k]
-		elseif k in keys(pomdplitedata)
-			data = pomdplitedata[k]
-		elseif k in keys(pomdpdata)
-			data = pomdpdata[k]
+		if k in keys(level1data)
+			data = level1data[k]
+		elseif k in keys(level2adata)
+			data = level2adata[k]
+		elseif k in keys(level2bdata)
+			data = level2bdata[k]
+		elseif k in keys(level3data)
+			data = level3data[k]
 		end
 		μ_cumulative_reward = cumsum(mismatch_mean(data["list_reward_over_time"]))
 		# σ_cumulative_reward = sqrt.(cumsum(mismatch_std(data["list_reward_over_time"])))
@@ -345,12 +384,15 @@ end
 savefig(agg_plot, "agg_plot.tex")
 
 # ╔═╡ c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
-BSON.@save "pomdpdata.bson" pomdpdata
+BSON.@save "level3data.bson" level3data
+
+# ╔═╡ bfa95d79-673d-4696-a786-b07ac811919e
+mean_std(map(sum, level3data["Level III"]["list_reward_over_time"]), false)
 
 # ╔═╡ 7a301ad6-e31f-4d20-b527-a26573473c0e
 begin
 	Random.seed!(1)
-	simulation(pomdp, pomcp_policy)
+	simulation(pomdp_level3, pomcp_policy_3)
 end
 
 # ╔═╡ fdb3db7f-7784-477f-ace2-b65df9031b41
@@ -359,19 +401,19 @@ md"""
 """
 
 # ╔═╡ 33beafb5-1fd2-4e0e-892b-1b5b9d2e0a77
-up = DiscreteSubspaceUpdater(pomdp)
+up = DiscreteSubspaceUpdater(pomdp_level3)
 
 # ╔═╡ 85a03af8-4734-48ee-8c6d-a8905e1f2feb
 begin
 	Random.seed!(0)
-	sv₀ = VisibleState(pomdp.params.capacity, pomdp.params.time, 1)
-	b₀ = initialize_belief(up, pomdp.visa_count, sv₀)
-	online_action, info = action_info(pomcp_policy, b₀, tree_in_info=true)
+	sv₀ = VisibleState(pomdp_level3.params.capacity, pomdp_level3.params.time, 1)
+	b₀ = initialize_belief(up, pomdp_level3.visa_count, sv₀)
+	online_action, info = action_info(pomcp_policy_3, b₀, tree_in_info=true)
 	online_action
 end
 
 # ╔═╡ 4efe4359-7041-45c9-bedf-939a41954831
-observation(pomdp, POMDPState((sv₀,sh_test)), ACCEPT, POMDPState((sv₀,shp_test)))
+observation(pomdp_level3, POMDPState((sv₀,sh_test)), ACCEPT, POMDPState((sv₀,shp_test)))
 
 # ╔═╡ 7fdc98bb-0c88-434f-99ed-e7876df3c6e2
 D3Tree(info[:tree], init_expand=1)
@@ -398,7 +440,7 @@ begin
 		# vdoc = documentation[rand(𝒟_true)]
 		# o = Observation(sv.c, sv.t, sv.f, vdoc)
 		sp = rand(transition(localpomdp, s, a))
-		if isterminal(pomdp, sp)
+		if isterminal(localpomdp, sp)
 			@warn "Terminal!"
 			break
 		end
@@ -417,13 +459,13 @@ md"""
 """
 
 # ╔═╡ 0d1c09ae-e27d-4d9c-84f4-13c4eca12b43
-plot_claims(pomdp.params.visa_prob; text="Visa probability distribution")
+plot_claims(pomdp_level3.params.visa_prob; text="Visa probability distribution")
 
 # ╔═╡ 56d742f1-4fb7-4afe-8674-f343d6672364
-pomdp.params.visa_prob
+pomdp_level3.params.visa_prob
 
 # ╔═╡ 9f2b615d-4187-424f-adb5-f092c78faec5
-plot_claims_tiny(pomdp.params.visa_prob)
+plot_claims_tiny(pomdp_level3.params.visa_prob)
 
 # ╔═╡ f429f2b4-959b-4ed2-bd49-6ba961ba2382
 md"""
@@ -436,27 +478,35 @@ traj_seed = 3
 # ╔═╡ 466f9de5-2df5-48a3-b481-7a45858410ae
 begin
 	Random.seed!(traj_seed)
-	mdp_trajectory = simulate_trajectory(mdp, mdp_policy; seed=traj_seed)
+	level1_trajectory = simulate_trajectory(mdp, mdp_policy; seed=traj_seed)
 end
 
 # ╔═╡ 7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
 begin
 	Random.seed!(traj_seed)
-	pomdplite_trajectory = simulate_trajectory(pomdplite, pomcp_policy_lite; 
+	level2a_trajectory = simulate_trajectory(mdp_level2a, pomcp_policy_2a; 
+											   seed=traj_seed)
+end
+
+# ╔═╡ bc26811d-9f22-46e5-97ef-5e2516dc1ec5
+begin
+	Random.seed!(traj_seed)
+	level2b_trajectory = simulate_trajectory(pomdp_level2b, pomcp_policy_2b; 
 											   seed=traj_seed)
 end
 
 # ╔═╡ ff841f9f-0603-4d05-a820-736a4cc62e3d
 begin
 	Random.seed!(traj_seed)
-	pomdp_trajectory = simulate_trajectory(pomdp, pomcp_policy; seed=traj_seed)
+	level3_trajectory = simulate_trajectory(pomdp_level3, pomcp_policy_3; 
+											   seed=traj_seed)
 end
 
 # ╔═╡ 3b3110a8-8322-404f-8ad9-f4361640666e
-[plot_claims_tiny(τ[end-1].b) for τ in pomdp_trajectory]
+[plot_claims_tiny(τ[end-1].b) for τ in level3_trajectory]
 
 # ╔═╡ 9c10c8d3-71a7-422b-b24e-8e2cb2997cca
-map(t->t[end-1].b, pomdp_trajectory[end-2:end])
+map(t->t[end-1].b, level3_trajectory[end-2:end])
 
 # ╔═╡ 5e000528-bdae-43a7-bd58-a7e2fb3d80be
 md"""
@@ -467,30 +517,16 @@ md"""
 N = 20
 
 # ╔═╡ f2d91ff3-db6d-41eb-89cb-85711048922c
-plot_trajectory(mdp, mdp_trajectory, "traj_mdp"; N=N)
+plot_trajectory(mdp, level1_trajectory, "traj_level1"; N=N)
 
 # ╔═╡ 281a7c2d-b1ce-4b33-b227-f3b2a6237725
-plot_trajectory(pomdplite, pomdplite_trajectory, "traj_pomdplite"; N=N, show_population=true)
+plot_trajectory(mdp_level2a, level2a_trajectory, "traj_level2a"; N=N, show_population=true, show_belief=false)
+
+# ╔═╡ 6b77d60f-48cc-4c64-aaf8-d496965c087f
+plot_trajectory(pomdp_level2b, level2b_trajectory, "traj_level2b"; N=N, show_population=false, show_belief=true)
 
 # ╔═╡ edabc978-aaec-4a09-a234-4fa9caf2b58e
-plot_trajectory(pomdp, pomdp_trajectory, "traj_pomdp"; N=N, show_belief=true, show_population=true)
-
-# ╔═╡ 1951a3db-fdfe-4630-ab6e-17c56f5e4913
-pomdp_trajectory[end][end-1]
-
-# ╔═╡ 9a142f50-9c0b-4d5a-807d-07d4992b5155
-md"""
-# Aggregate statistics
-"""
-
-# ╔═╡ d3ffbfb2-38ff-4003-a93b-0c804d90d8fc
-pomdp.params.visa_count
-
-# ╔═╡ f1e42b93-d895-4706-8044-9863c65908e7
-pomdp.visa_count
-
-# ╔═╡ 9757ae45-a980-42a5-9373-44aad5a34d41
-hist2 = simulation(pomdp, pomcp_policy)
+plot_trajectory(pomdp_level3, level3_trajectory, "traj_level3"; N=N, show_population=true, show_belief=true)
 
 # ╔═╡ Cell order:
 # ╠═30028219-7ea5-4b78-b0df-b3b98b25ee65
@@ -500,6 +536,7 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═fe9dfc73-f502-4d13-a019-8160a6af4617
 # ╟─3771f6a0-3926-4234-b4b2-69ec8f96fa41
 # ╠═3b468bb0-9e90-40b0-9a24-60fba6ca4fc5
+# ╠═f9b11f1e-04b9-488c-9884-ab0bb77a945c
 # ╟─47a33688-6458-44a6-a5e5-3a6a220e9c39
 # ╠═6bf5f2f2-b5d1-48a6-b811-f416bcfc9899
 # ╟─5acdce32-b587-4ea2-8317-a753429fcd7b
@@ -514,11 +551,16 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═6d708221-9d27-4e14-a621-420128f2faa3
 # ╠═8d98f5fc-9f8f-4cb2-a791-3e1a987ed56e
 # ╠═b2f56210-7de8-4cf2-9f54-1982dde001d8
+# ╠═b7c4ae6e-148a-4bcc-8bf1-8c0b01ef54d2
 # ╠═d0407ec6-3566-409c-a53a-7b9e0501c4ad
 # ╠═c0ef8c17-bf5d-4a77-bcdb-30d43721c18d
 # ╠═e24fb800-57fb-4a7e-8c48-b349b661ae93
-# ╠═7b608351-17ef-4dd9-aa17-1c69bacd47d9
+# ╠═595dc813-048c-415b-a98d-d943f8db9328
+# ╠═118ab216-0548-4ec4-b933-cedf78f08c55
 # ╠═a17792e3-d4fb-498c-bf8b-d25f9e9efc5c
+# ╠═10ed9198-8dd3-43e1-b311-d200fc934649
+# ╠═9f7b2cf0-9765-4846-b510-4cd084a4b760
+# ╠═bfa95d79-673d-4696-a786-b07ac811919e
 # ╠═dd15d7f4-a163-44d4-8f8f-7915a78ed4f6
 # ╠═8d2b9590-8d76-4675-9b8a-e6a47cbccb8c
 # ╟─2b2ed9bd-e033-47ea-b24b-4789f28ab08c
@@ -545,12 +587,14 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═27bd873f-c7b1-4323-99e3-6f6be02eb8b5
 # ╠═f094c09e-2f51-4b1b-81cb-a6832baccb92
 # ╠═36c1fe73-2559-4f9e-95f3-3e79ed0c0264
+# ╠═bb444390-3331-446d-b53a-c8fb91da8c05
+# ╠═7ba2489f-fc55-4002-bc05-e47876eba660
+# ╠═a015b077-2fc6-49b6-a99c-0069cf9dfd7b
 # ╟─c08f9f26-46d0-405a-80d9-6b766af0bf44
 # ╠═4cb1fb17-523e-4eab-a9e7-7e1bf0b9edde
-# ╠═6986006a-dd3e-41ce-8255-1beed5b772a7
-# ╠═fe03b798-c728-4033-bba2-e8a3de80b1c7
-# ╠═53444381-2249-42fd-8129-724b885938c4
+# ╠═06167243-febb-4c48-b088-efabacff64f5
 # ╠═6fe49d6b-343a-4250-8744-a6ba734e51d0
+# ╠═fe0b9861-f14a-4ecd-bc3a-8cbf70badb97
 # ╟─5629a62b-0532-4736-aa8b-e814192ed9c0
 # ╠═8aeff62d-6c27-4f6b-9b0d-8d18df1c2902
 # ╠═0c3d6891-74fc-4d39-a0d4-080d929677f8
@@ -575,14 +619,11 @@ hist2 = simulation(pomdp, pomcp_policy)
 # ╠═38b970ed-0fc2-44d4-bf0d-4ad5fa70d1ff
 # ╠═466f9de5-2df5-48a3-b481-7a45858410ae
 # ╠═7ff64ea4-7086-40ad-bd1b-faed62a4d7f2
+# ╠═bc26811d-9f22-46e5-97ef-5e2516dc1ec5
 # ╠═ff841f9f-0603-4d05-a820-736a4cc62e3d
 # ╟─5e000528-bdae-43a7-bd58-a7e2fb3d80be
 # ╠═2bb01d5f-e8f4-4986-ad6f-5a44daa464b9
 # ╠═f2d91ff3-db6d-41eb-89cb-85711048922c
 # ╠═281a7c2d-b1ce-4b33-b227-f3b2a6237725
+# ╠═6b77d60f-48cc-4c64-aaf8-d496965c087f
 # ╠═edabc978-aaec-4a09-a234-4fa9caf2b58e
-# ╠═1951a3db-fdfe-4630-ab6e-17c56f5e4913
-# ╟─9a142f50-9c0b-4d5a-807d-07d4992b5155
-# ╠═d3ffbfb2-38ff-4003-a93b-0c804d90d8fc
-# ╠═f1e42b93-d895-4706-8044-9863c65908e7
-# ╠═9757ae45-a980-42a5-9373-44aad5a34d41
