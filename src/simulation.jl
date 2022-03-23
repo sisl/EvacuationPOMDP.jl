@@ -19,21 +19,22 @@ function get_metrics(params, history)
     end
 
     if typeof(history) <: SimHistory
-        iterator = eachstep(history, "(s, a, r, sp)")
+        iterator = eachstep(history, "(s, a, r, sp, t)")
     else
         iterator = history
     end
 
     # MDPState(c, t, f, v)
-    for (s, a, r, sp) in iterator
+    for (s, a, r, sp, truth) in iterator
         # only counting the s not sp so as not to double count
         if typeof(s) <: POMDPState
             f = visible(s).f
-            v = hidden(s).v
+            # v = hidden(s).v
         else
             f = s.f
-            v = s.v
+            # v = s.v
         end
+        v = truth
 
         if a==ACCEPT
             total_accepted_people += f
@@ -54,19 +55,28 @@ function get_metrics(params, history)
     return total_accepted_people, total_rejected_people, total_accepted_families, total_reward, reward_over_time, visa_dict_accepts, visa_dict_rejects, visa_dict_accepts_rate
 end
 
+function obs2state(vdoc::VisaDocument)
+    return VisaStatus(Int(vdoc))
+end
 
 function manual_simulate(mdp::EvacuationMDP, policy, population)
     first_fam = popfirst!(population)
     _s = rand(initialstate(mdp))
-    s = MDPState(_s.c, _s.t, first_fam.family_size, first_fam.status)
+    status = obs2state(first_fam.obs_status)
+    true_status = first_fam.true_status
+    s = MDPState(_s.c, _s.t, first_fam.family_size, status)
+    s_true = MDPState(_s.c, _s.t, first_fam.family_size, true_status)
     τ = []
     while !isterminal(mdp, s)
         a = action(policy, s)
-        r = reward(mdp, s, a)
-        status, family_size, made_it_through = popfirst!(population)
+        r = reward(mdp, s_true, a)
+        sp_true_status, sp_obs_status, family_size, made_it_through = popfirst!(population)
+        status = obs2state(sp_obs_status)
         sp = rand(transition(mdp, s, a; input_status=status, input_family_size=family_size, made_it_through=made_it_through))
-        push!(τ, (s=s, a=a, r=r, sp=sp))
+        push!(τ, (s=s, a=a, r=r, sp=sp, truth=true_status))
         s = sp
+        true_status = sp_true_status
+        s_true = MDPState(s.c, s.t, s.f, true_status)
     end
     return τ
 end
@@ -76,8 +86,10 @@ function manual_simulate(pomdp::EvacuationPOMDPType, policy, up::Updater, popula
     first_fam = popfirst!(population)
     reset_population_belief!(pomdp)
     _s = rand(initialstate(pomdp))
-    s = newstate(POMDPState, visible(_s).c, visible(_s).t, first_fam.family_size, first_fam.status)
-    Random.seed!(0) # TODO.
+    status = obs2state(first_fam.obs_status)
+    true_status = first_fam.true_status
+    s = newstate(POMDPState, visible(_s).c, visible(_s).t, first_fam.family_size, status)
+    s_true = newstate(POMDPState, visible(s).c, visible(s).t, visible(s).f, true_status)
     o0 = rand(observation(pomdp, s, REJECT, s))
     prior_belief = initialize_belief(up, pomdp.visa_count, s)
     b = update(up, prior_belief, REJECT, o0)
@@ -85,18 +97,20 @@ function manual_simulate(pomdp::EvacuationPOMDPType, policy, up::Updater, popula
 
     while !isterminal(pomdp, s)
         a = action(policy, b)
-        r = reward(pomdp, s, a)
-        status, family_size, made_it_through = popfirst!(population)
+        r = reward(pomdp, s_true, a)
+        sp_true_status, sp_obs_status, family_size, made_it_through = popfirst!(population)
+        status = obs2state(sp_obs_status)
         sp = rand(transition(pomdp, s, a; input_status=status, input_family_size=family_size, made_it_through=made_it_through))
-        Random.seed!(0) # TODO.
         o = rand(observation(pomdp, s, a, sp))
         bp = update(up, b, a, o)
         if include_all
-            push!(τ, (s=s, a=a, r=r, sp=sp, b=b, o=o, o0=o0))
+            push!(τ, (s=s, a=a, r=r, sp=sp, b=b, o=o, o0=o0, truth=true_status))
         else
-            push!(τ, (s=s, a=a, r=r, sp=sp))
+            push!(τ, (s=s, a=a, r=r, sp=sp, truth=true_status))
         end
         s = sp
+        true_status = sp_true_status
+        s_true = newstate(POMDPState, visible(s).c, visible(s).t, visible(s).f, true_status)
         b = bp
     end
     return τ
@@ -315,21 +329,26 @@ function trailing_zeros(x::String, d=2)
 end
 
 
-function generate_population_trajectories()
+function generate_population_trajectories(seed=47)
     params = EvacuationParameters()
-    pop_distribution = SparseCat(params.visa_status, normalize(params.visa_count, 1))
     family_distribution = SparseCat(params.family_sizes, params.family_prob)
 
-    Random.seed!(10)
+    Random.seed!(seed)
     N = 1000
     pops = Vector(undef, N)
-    for i in 1:1000
+    tmp_pomdp = EvacuationPOMDPType()
+    for i in 1:N
         pops[i] = []
+        dir = Dirichlet(params.visa_prior_count)
+        pop_distribution = SparseCat(params.visa_status, rand(dir))
         for t in 0:params.time+1
-            status = rand(pop_distribution)
+            true_status = rand(pop_distribution)
             family_size = rand(family_distribution)
+            s = newstate(POMDPState, 1, 1, family_size, true_status)
+            obs = rand(observation(tmp_pomdp, s, ACCEPT, s))
+            obs_status = obs.vdoc
             made_it_through = rand() < params.p_transition
-            sample = (status=status, family_size=family_size,
+            sample = (true_status=true_status, obs_status=obs_status, family_size=family_size,
                       made_it_through=made_it_through)
             push!(pops[i], sample)
         end
@@ -337,7 +356,9 @@ function generate_population_trajectories()
     open("population.json", "w+") do f
         write(f, JSON.json(pops))
     end
-    @show findall(map(pop->ISIS in map(p->p.status, pop), pops))
+    num_isis_true = length(findall(map(pop->ISIS in map(p->p.true_status, pop), pops)))
+    num_isis_obs = length(findall(map(pop->ISIS_indicator in map(p->p.obs_status, pop), pops)))
+    @show num_isis_true, num_isis_obs
     return pops
 end
 
@@ -345,6 +366,6 @@ end
 function read_population_json()
     open("population.json", "r") do f
         pops = JSON.parse(read(f, String))
-        [map(p->(status=eval(Meta.parse(p["status"])), family_size=p["family_size"], made_it_through=p["made_it_through"]), pop) for pop in pops]
+        [map(p->(true_status=eval(Meta.parse(p["true_status"])), obs_status=eval(Meta.parse(p["obs_status"])), family_size=p["family_size"], made_it_through=p["made_it_through"]), pop) for pop in pops]
     end
 end

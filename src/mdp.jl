@@ -36,7 +36,7 @@ POMDPs.actionindex(mdp::EvacuationMDP, a::Action) = Int(a) + 1
 
 
 function likelihood(mdp::EvacuationMDP, params::EvacuationParameters, v::Int)
-    return params.visa_prob[v]
+    return params.visa_prior[v]
 end
 
 

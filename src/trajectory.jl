@@ -16,7 +16,7 @@ function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing, verbose=f
         o₀ = last(collect(iterator))[end].o0
     end
     
-    for (t, (s, a, r, sp, b, o)) in iterator
+    for (t, (s, a, r, sp, b, o, _, truth)) in iterator
         a == ACCEPT && @info ACCEPT, t
         if verbose
             @show t
@@ -39,12 +39,12 @@ function simulate_trajectory(pomdp::POMDP, pomdp_policy; seed=nothing, verbose=f
             @show r
             println("—"^20)
         end
-        push!(trajectory, (s,a,o,b,r))
+        push!(trajectory, (s,a,o,b,r,truth))
     end
 
-    trajectory′ = Tuple{Any,Any,Any,Any,Any}[(trajectory[1][1], trajectory[1][2], o₀, trajectory[1][4], trajectory[1][5])]
+    trajectory′ = Tuple{Any,Any,Any,Any,Any,Any}[(trajectory[1][1], trajectory[1][2], o₀, trajectory[1][4], trajectory[1][5], trajectory[1][6])]
     for i in 2:length(trajectory)
-        push!(trajectory′, (trajectory[i][1], trajectory[i][2], trajectory[i-1][3], trajectory[i][4], trajectory[i][5]))
+        push!(trajectory′, (trajectory[i][1], trajectory[i][2], trajectory[i-1][3], trajectory[i][4], trajectory[i][5], trajectory[i][6]))
     end
     return trajectory′
 end
@@ -61,7 +61,7 @@ function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing, verbose=false)
         iterator = enumerate(manual_simulate(mdp, mdp_policy, population))
     end
 
-    for (t, (s, a, r, sp)) in iterator
+    for (t, (s, a, r, sp, truth)) in iterator
         if verbose
             @show t
             println("Capacity=$(s.c), time remaining=$(s.t)")
@@ -76,7 +76,7 @@ function simulate_trajectory(mdp::MDP, mdp_policy; seed=nothing, verbose=false)
             @show r
             println("—"^20)
         end
-        push!(trajectory, (s,a,r))
+        push!(trajectory, (s,a,r,truth))
     end
 
     return trajectory
@@ -107,18 +107,18 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
             i = (length(trajectory) - half) + (i - half)
         end
         if m isa MDP
-            (s,a,r) = trajectory[i]
-            obs = ""
-            node_tags[nodei] = ""
+            (s,a,r,truth) = trajectory[i]
+            obs = _visa_status_labels[Int(getstatus(s))+1]
         elseif m isa POMDP
-            (s,a,o,b,r) = trajectory[i]
-            obs = "\\\\{\\color{gray}($(_visa_status_labels[Int(o.vdoc)+1]))}"
-            node_tags[nodei] = Int(o.vdoc) != Int(getstatus(s)) ? "{\\color{white}x}" : ""
+            (s,a,o,b,r,truth) = trajectory[i]
+            obs = _visa_status_labels[Int(o.vdoc)+1]
         end
         t = gettime(s)
         c = getcapacity(s)
         f = getfamilysize(s)
-        v = getstatus(s)
+        v = truth
+        truth_label = _visa_status_labels[Int(v)+1]
+        node_tags[nodei] = obs != truth_label ? "{\\color{white}x}" : ""
 
         color = a == ACCEPT ? _color_accept : _color_reject
         color = nodei == nv(g) ? "gray" : color
@@ -141,15 +141,16 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
         else
             pop_belief = ""
         end
-
         
+        obs_node = obs
+        truth_node = string("\\\\{\\color{gray}($truth_label)}")
 
         node_styles[nodei] =
         "circle, draw=black, fill=$color, minimum size=$(f)mm,
          label={[align=center]below:\$t_{$t}\$\\\\
                 \$(c_{$c})\$\\\\
                 {\\scriptsize\\color{$rcolor}\$($(round(r, digits=2)))\$}},
-         label={[align=center]above:$pop_belief$belief$(_visa_status_labels[Int(v)+1]) $obs}"
+         label={[align=center]above:$pop_belief$belief$obs_node$truth_node}"
     end
     tp = TikzGraphs.plot(g, node_tags, node_styles=node_styles,
                          options="grow'=right, level distance=22mm, semithick, >=stealth'")

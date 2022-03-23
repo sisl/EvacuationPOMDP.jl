@@ -84,18 +84,21 @@ end
         SIV => reward_SIV,
         AMCIT => reward_AMCIT)
 
-    visa_prob = normalize([
+    visa_true_prob = normalize([
         num_ISIS/num_total_airport,
         num_Vulnerable_Afghan/num_total_airport,
         num_P1P2_Afghan/num_total_airport,
         num_SIV/num_total_airport,
         num_AMCIT/num_total_airport], 1)
 
-    visa_count = [num_ISIS,
+    visa_true_count = [num_ISIS,
                   num_Vulnerable_Afghan,
                   num_P1P2_Afghan,
                   num_SIV,
                   num_AMCIT]
+
+    visa_prior_count = visa_true_count / 100_000 # [0.2, 20, 15, 10, 5]
+    visa_prior = normalize(visa_prior_count, 1)
 
     #for simplicity for now, "vulnerable afghan = afghan"
     v_stringtoint = Dict(
@@ -157,7 +160,7 @@ end
     documentation = [ISIS_indicator, VulAfghan_document, P1P2Afghan_document, SIV_document, AMCIT_document]
     individual_uncertainty = true
     population_uncertainty = true
-    visa_count = population_uncertainty ? ones(length(params.visa_count)) : deepcopy(params.visa_count) # uniform prior updated as a Dirichlet, used in 𝑇(s′ | s, a)
+    visa_count = deepcopy(params.visa_prior_count)
 end
 
 
@@ -185,7 +188,8 @@ function R(params::EvacuationParameters, c::Int, t::Int, f::Int, v::VisaStatus, 
     elseif a == ACCEPT
         return params.visa_status_lookup[v]*f
     else
-        return -sqrt(params.time-t) # 0
+        return -sqrt(params.time-t)
+        # return 0
         # return -c/(t+1)
     end
 end

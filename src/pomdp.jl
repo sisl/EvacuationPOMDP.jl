@@ -183,9 +183,5 @@ end
 
 
 function reset_population_belief!(pomdp::EvacuationPOMDPType)
-    if pomdp.population_uncertainty
-        pomdp.visa_count = ones(length(pomdp.visa_count))
-    else
-        pomdp.visa_count = deepcopy(pomdp.params.visa_count)
-    end
+    pomdp.visa_count = deepcopy(pomdp.params.visa_prior_count)
 end
