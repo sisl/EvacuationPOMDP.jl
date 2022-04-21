@@ -52,8 +52,23 @@ end
 ##################################################
 
 
+struct NonISISPolicy <: Policy end
+
+function POMDPs.action(::NonISISPolicy, s::MDPState)
+    return (s.v == ISIS) ? REJECT : ACCEPT
+end
+
+function POMDPs.action(::NonISISPolicy, s::POMDPState)
+    sh = hidden(s)
+    return (sh.v == ISIS) ? REJECT : ACCEPT
+end
+
+
+##################################################
+
+
 @with_kw mutable struct AfterThresholdAMCITsPolicy <: Policy
-    threshold = 20
+    threshold = 200
     mdp_policy
 end
 
@@ -70,7 +85,7 @@ end
 
 
 @with_kw struct BeforeThresholdAMCITsPolicy <: Policy
-    threshold = 20
+    threshold = 200
     mdp_policy
 end
 
@@ -102,4 +117,17 @@ function POMDPs.action(policy::MDPRolloutPolicy, s::POMDPState)
     sh = hidden(s)
     s_mdp = newstate(MDPState, sv.c, sv.t, sv.f, sh.v)
     return action(policy.mdp_policy, s_mdp)
+end
+
+
+##################################################
+struct MDPValueEstimator <: Policy
+    mdp_policy
+end
+
+function POMDPs.value(policy::MDPValueEstimator, s::POMDPState)
+    sv = visible(s)
+    sh = hidden(s)
+    s_mdp = newstate(MDPState, sv.c, sv.t, sv.f, sh.v)
+    return value(policy.mdp_policy, s_mdp)
 end

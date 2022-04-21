@@ -28,13 +28,13 @@ function plot_claims(p; small=false, text="", xticks=false, legend=false, kwargs
         leftmargin=3Plots.mm,
         xticks=xticks || !small ? true : (1:length(p), fill("", length(p))),
         yticks=([0, 0.5, 1], [0, 0.5,  1]),
-        ylims=(0, 1.20),
+        ylims=(0, 1.25),
         size=small ? (600,150) : (500,150),
         legendfontsize=2,
         c=[get(cmap_bar, i/length(categories)) for i in 1:length(categories)]';
         kwargs...
     )
-    annotate!([(0, 1.075, (text, 10, :black, :left))])
+    annotate!([(0, 1.125, (text, 10, :black, :left))])
 end
 
 
@@ -124,16 +124,17 @@ end
 function vis_all(params, policy)
     total_time = params.time 
     total_capacity = params.capacity
-    graph_per_n = 60
+    graph_per_n_time = 600 # 60
+    graph_per_n_cap = 250 # 60
     heat_maps = []
-    time_points = (total_time/graph_per_n) + 1 # to include 0 
-    capacity_points = (total_capacity/graph_per_n) + 1 
+    time_points = (total_time/graph_per_n_time) + 1 # to include 0 
+    capacity_points = (total_capacity/graph_per_n_cap) + 1 
     num_graphs = trunc(Int, time_points*capacity_points)
     
     for t in reverse(0:total_time)
-        if t % graph_per_n == 0 
+        if t % graph_per_n_time == 0 
             for c in reverse(0:total_capacity)
-                if c % graph_per_n == 0
+                if c % graph_per_n_cap == 0
                     if c == 0
                         c = 1
                     end

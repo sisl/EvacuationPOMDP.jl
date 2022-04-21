@@ -76,7 +76,9 @@ export
     BeforeThresholdAMCITsPolicy,
     RandomBaselinePolicy,
     MDPRolloutPolicy,
-    SIVAMCITsP1P2Policy
+    MDPValueEstimator,
+    SIVAMCITsP1P2Policy,
+    NonISISPolicy
 include("policies.jl")
 
 

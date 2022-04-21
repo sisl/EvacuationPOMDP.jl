@@ -109,6 +109,9 @@ function plot_trajectory(m::Union{MDP,POMDP}, trajectory, filename; N=length(tra
         if m isa MDP
             (s,a,r,truth) = trajectory[i]
             obs = _visa_status_labels[Int(getstatus(s))+1]
+            if show_belief
+                b = (b=obs_model[getstatus(s)],)
+            end
         elseif m isa POMDP
             (s,a,o,b,r,truth) = trajectory[i]
             obs = _visa_status_labels[Int(o.vdoc)+1]

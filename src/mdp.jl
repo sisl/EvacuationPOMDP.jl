@@ -123,9 +123,21 @@ function POMDPs.transition(m::M, s::S, a::Action; input_status::Union{Nothing,Vi
     return SparseCat(next_states, probabilities)
 end
 
+obs_model = Dict(
+    ISIS => [1.0, 0.0, 0.0, 0.0, 0.0],
+    VulAfghan => [3.1656549820404276e-5, 0.9999683434501796, 0.0, 0.0, 0.0],
+    P1P2Afghan => [3.0066680072073556e-7, 0.29784080821525005, 0.7021588911179494, 0.0, 0.0],
+    SIV => [0.0, 0.03638404264680784, 0.37673848941274174, 0.5868774679404505, 0.0],
+    AMCIT => [0.0, 0.03703520238186705, 0.24652344950650082, 0.05430733869570854, 0.6621340094159236]
+)
 
-function POMDPs.reward(mdp::EvacuationMDP, s::MDPState, a::Action)
-    return R(mdp.params, s.c, s.t, s.f, s.v, a)
+function POMDPs.reward(mdp::EvacuationMDP, s::MDPState, a::Action; as_obs=false)
+    if as_obs
+        𝐫 = [reward(mdp, MDPState(s.c, s.t, s.f, v), a; as_obs=false) for v in mdp.params.visa_status]
+        return dot(obs_model[s.v], 𝐫)
+    else
+        return R(mdp.params, s.c, s.t, s.f, s.v, a)
+    end
 end
 
 

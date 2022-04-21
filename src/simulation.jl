@@ -25,7 +25,7 @@ function get_metrics(params, history)
     end
 
     # MDPState(c, t, f, v)
-    for (s, a, r, sp, truth) in iterator
+    for (t,(s, a, r, sp, truth)) in enumerate(iterator)
         # only counting the s not sp so as not to double count
         if typeof(s) <: POMDPState
             f = visible(s).f
@@ -36,7 +36,7 @@ function get_metrics(params, history)
         end
         v = truth
 
-        if a==ACCEPT
+        if a == ACCEPT
             total_accepted_people += f
             total_accepted_families += 1
             visa_dict_accepts[v] += f
@@ -69,7 +69,7 @@ function manual_simulate(mdp::EvacuationMDP, policy, population)
     τ = []
     while !isterminal(mdp, s)
         a = action(policy, s)
-        r = reward(mdp, s_true, a)
+        r = reward(mdp, s_true, a; as_obs=false)
         sp_true_status, sp_obs_status, family_size, made_it_through = popfirst!(population)
         status = obs2state(sp_obs_status)
         sp = rand(transition(mdp, s, a; input_status=status, input_family_size=family_size, made_it_through=made_it_through))
@@ -148,17 +148,18 @@ end
 
 
 """ Takes in a list and takes their rounded mean and standard deviation """
-function mean_std(list_simulated_values, people::Bool)
+function mean_se(list_simulated_values, people::Bool, n_sims)
+    rootn = sqrt(n_sims)
     if people
         # round to whole people trunc
         mean_list = trunc(Int, mean(list_simulated_values))
-        std_list = trunc(Int, std(list_simulated_values))
-#        std_list = round(std(list_simulated_values); digits=2)
+        se_list = trunc(Int, std(list_simulated_values)/rootn)
+#        se_list = round(std(list_simulated_values); digits=2)
     else
         mean_list = round(mean(list_simulated_values); digits=2)
-        std_list = round(std(list_simulated_values); digits=2)
+        se_list = round(std(list_simulated_values)/rootn; digits=2)
     end
-    return mean_list, std_list
+    return mean_list, se_list
 end
 
 
@@ -193,10 +194,10 @@ function simulations(policy, str_policy, mdp, n_sims) # n is number of times to 
 
     round_people_to_ints = false # NOTE: Changing to allow "decimal" people.
 
-    mean_std_reward = mean_std(list_total_reward, false)
-    mean_std_total_accepted_people = mean_std(list_total_accepted_people, false)
-    mean_std_total_people = mean_std(list_total_accepted_people + list_total_rejected_people, false)
-    mean_std_percent_accepted_people = mean_std(100 * list_total_accepted_people ./ (list_total_accepted_people + list_total_rejected_people), false)
+    mean_se_reward = mean_se(list_total_reward, false, n_sims)
+    mean_se_total_accepted_people = mean_se(list_total_accepted_people, false, n_sims)
+    mean_se_total_people = mean_se(list_total_accepted_people + list_total_rejected_people, false, n_sims)
+    mean_se_percent_accepted_people = mean_se(100 * list_total_accepted_people ./ (list_total_accepted_people + list_total_rejected_people), false, n_sims)
 
     # calculate average ppl by visa type
     base_dict = Dict{VisaStatus, Int64}() #1=>0)
@@ -243,8 +244,8 @@ function simulations(policy, str_policy, mdp, n_sims) # n is number of times to 
         tabs_policy = "\t\t"
     end
 
-    # print("$str_policy$tabs_policy&\t\t\$$(mean_std_reward[1]) \\pm $(mean_std_reward[2])\$\t&\t\t\$$(mean_std_total_accepted_people[1]) \\pm $(mean_std_total_accepted_people[2]) \\;($(mean_std_percent_accepted_people[1])\\pm$(mean_std_percent_accepted_people[2])\\%)\$\t\t&\t")
-    print("$str_policy$tabs_policy&\t\t\$$(mean_std_reward[1]) \\pm $(mean_std_reward[2])\$\t&\t\t\$($(mean_std_total_accepted_people[1]) \\pm $(mean_std_total_accepted_people[2]))/$(mean_std_total_people[1])\$\t\t&\t")
+    # print("$str_policy$tabs_policy&\t\t\$$(mean_se_reward[1]) \\pm $(mean_se_reward[2])\$\t&\t\t\$$(mean_se_total_accepted_people[1]) \\pm $(mean_se_total_accepted_people[2]) \\;($(mean_se_percent_accepted_people[1])\\pm$(mean_se_percent_accepted_people[2])\\%)\$\t\t&\t")
+    print("$str_policy$tabs_policy&\t\t\$$(mean_se_reward[1]) \\pm $(mean_se_reward[2])\$\t&\t\t\$($(mean_se_total_accepted_people[1]) \\pm $(mean_se_total_accepted_people[2]))/$(mean_se_total_people[1])\$\t\t&\t")
     for visa_status in sort(collect(keys(base_dict)), rev=true)
         st_visa_status = string(visa_status)
         expectation_acc = round(base_dict[visa_status]/n_sims, digits=2)
@@ -295,6 +296,7 @@ function experiments(n_sims, mdp::EvacuationMDP, mdp_policy)
         "AMCITs"=>AMCITsPolicy(),
         "SIV-AMCITs"=>SIVAMCITsPolicy(),
         "SIV-AMCITs-P1P2"=>SIVAMCITsP1P2Policy(),
+        "Non-ISIS"=>NonISISPolicy(),
         "AfterThresholdAMCITs"=>AfterThresholdAMCITsPolicy(mdp_policy=mdp_policy),
         "BeforeThresholdAMCITs"=>BeforeThresholdAMCITsPolicy(mdp_policy=mdp_policy),
     )

@@ -68,10 +68,10 @@ end
     num_AMCIT = 14786 # this includes family members of AMCITs to be evacuated
 
     reward_ISIS = -500
-    reward_Vulnerable_Afghan = -3 # Question for Thomas: should it be positive? based on our conversation it seems like they were trying to accept people who might be vulnerable, such as women and children.
-    reward_P1P2_Afghan = 1
-    reward_SIV = 5
-    reward_AMCIT = 20
+    reward_Vulnerable_Afghan = 1 # Question for Thomas: should it be positive? based on our conversation it seems like they were trying to accept people who might be vulnerable, such as women and children.
+    reward_P1P2_Afghan = 5
+    reward_SIV = 25
+    reward_AMCIT = 100
 
     num_total_airport = num_AMCIT + num_SIV + num_P1P2_Afghan + num_Vulnerable_Afghan + num_ISIS
 
@@ -119,22 +119,23 @@ end
         reward_SIV=>"SIV",
         reward_AMCIT=>"AMCIT")
 
-    capacity::Int = 120 # keeping these both as integers of 20 for now.
-    time::Int = 120
+    capacity::Int = 500 # 120 # keeping these both as integers of 20 for now.
+    time::Int = 1200 # 120
     size::Tuple{Int, Int} = (length(visa_status), length(family_sizes)) # grid size
     p_transition::Real = 0.8 # this is uncertainty we integrated in our model that described the likelihood of transitioning onto the airplane given they are let into the airport
     null_state::MDPState = MDPState(-1, -1, -1 ,NULL)
     accept_prob = [p_transition, 1-p_transition]
     reject_prob = [1.0]
+    roa_reward = false
 end
 
 
 @with_kw struct ClaimModel
     p_amcit = normalize([0, 0, 0, 0.0, 1.0], 1)
     p_siv = normalize([0, 0, 0, 0.99, 0.01], 1)
-    p_p1p2 = normalize([0, 0, 0.95, 0.04, 0.01], 1)
-    p_afghan = normalize([0, 0.94, 0.05, 0.009, 0.001], 1)
-    p_isis = normalize([0.9, 0.09, 0.005, 0.005, 0], 1)
+    p_p1p2 = normalize([0, 0, 0.85, 0.14, 0.01], 1)
+    p_afghan = normalize([0, 0.75, 0.24, 0.009, 0.001], 1)
+    p_isis = normalize([0.01, 0.98, 0.01, 0.0, 0], 1)
 end
 
 
@@ -182,15 +183,11 @@ validcapacity(s::Union{MDPState,VisibleState}) = s.c > 0
 ## Reward function
 ##################################################
 function R(params::EvacuationParameters, c::Int, t::Int, f::Int, v::VisaStatus, a::Action)
-    # reward is just the visa status times family size i think! 
-    if t ≤ 0 || c ≤ 0 # TODO: isterminal
-        return -abs(c) # penalize overflow and underflow.
-    elseif a == ACCEPT
-        return params.visa_status_lookup[v]*f
+    ϵ = 1e-4
+    if a == ACCEPT
+        return params.visa_status_lookup[v]*f + ϵ
     else
-        return -sqrt(params.time-t)
-        # return 0
-        # return -c/(t+1)
+        return 0
     end
 end
 
@@ -198,7 +195,7 @@ end
 ##################################################
 ## Discount factor
 ##################################################
-POMDPs.discount(mdp::Union{EvacuationMDP, EvacuationPOMDPType}) = 0.95
+POMDPs.discount(mdp::Union{EvacuationMDP, EvacuationPOMDPType}) = 1 # 0.95
 
 
 ##################################################
