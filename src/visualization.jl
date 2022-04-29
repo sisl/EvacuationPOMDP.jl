@@ -67,7 +67,7 @@ function plot_all_claims(pomdp::EvacuationPOMDPType)
     p3 = plot_claims(claims.p_p1p2; small=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{P1/P2})")
     p4 = plot_claims(claims.p_afghan; small=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{Vul. Afghan})")
     p5 = plot_claims(claims.p_isis; small=true, xticks=true, text=L"P(v_\mathrm{obs} \mid v=\texttt{ISIS})")
-    Plots.plot(p1, p2, p3, p4, p5, layout=@layout([a;b;c;d;e]), size=(450,500), plot_title="claim models")
+    Plots.plot(p1, p2, p3, p4, p5, layout=@layout([a;b;c;d;e]), size=(450,500))
 end
 
 
@@ -79,7 +79,6 @@ function vis_time_step(params, policy, c, t)
     f_size = length(params.family_sizes)
     policyGraph = zeros(v_size, f_size) 
     
-    # TODO: Revisit due to `params.visa_status` changed to @enum
     visa_statuses = params.visa_status
     x = Int.(visa_statuses)
     family_sizes = params.family_sizes
@@ -102,10 +101,10 @@ function vis_time_step(params, policy, c, t)
     capVal = string(c)
     titleX = string("\$t_{$timeVal}, c_{$capVal}\$")
 
-    return heatmap(x, y, z, 
+    return heatmap(x, y, z,
          # aspect_ratio = 1,
          legend = :none, 
-         xlims = (x[1]-0.5, x[end]+0.5),
+         xlims = (x[1]-0.5, x[end]+0.5-0.1),
          ylims = (params.family_sizes[1], params.family_sizes[end]),
          yticks = (params.family_sizes[1]:params.family_sizes[end], [1, "", "", 4, "", "", 7, "", "", 10, "", "", 13]),
          xticks = (x[1]:x[end], visa_statuses_short),

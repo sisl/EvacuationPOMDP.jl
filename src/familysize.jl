@@ -12,11 +12,10 @@ function plot_family_size_distribution(fam_probs)
     return bar(fam_probs,
                bar_width=1,
                xticks=(1:13),
-               label="family size",
+               label=false,
                c=:gray,
                ylims=(0, 0.31),
                xlabel="family size at gate",
                ylabel="likelihood",
-               title="family size distribution at gate",
                size=(500,300))
 end
