@@ -1,8 +1,5 @@
 # Prioritizing Emergency Evacuations using POMDPs: A Case Study of the Afhganistan Evacuation
-2022 IEEE GHTC Conference Submission: _Prioritizing emergency evacuations under compounding levels of uncertainty_
-
-Info in Overleaf: 
-https://www.overleaf.com/project/61df03a4a582c1465215cb95
+_Prioritizing emergency evacuations under compounding levels of uncertainty_, 2022 IEEE GHTC submission.
 
 <p align="center">
   <img src="./media/trajectory.svg">
